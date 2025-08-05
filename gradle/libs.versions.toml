@@ -1,30 +1,28 @@
 [versions]
 accompanistNavigationAnimation = "0.34.0"
-agp = "8.6.0"  # Fixed to valid stable version
+agp = "8.6.0"  # Fixed to valid stable
 androidImageCropper = "4.3.3"
 coilComposeVersion = "2.7.0"
 
-kotlin = "2.0.20"  # Updated to stable
-coreKtx = "1.13.1"
+kotlin = "2.0.20"  # Fixed for unresolved 'kotlin'
+coreKtx = "1.16.0"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
-lifecycleRuntimeKtx = "2.8.6"
-activityCompose = "1.9.2"
-composeBom = "2024.09.03"
+lifecycleRuntimeKtx = "2.9.2"
+activityCompose = "1.10.1"
+composeBom = "2024.09.00"
 coil = "2.7.0"
 navigation = "2.7.5"
-navigationCompose = "2.8.1"  # Latest stable
+navigationCompose = "2.7.7"
 
-googleApiClient = "2.7.0"
-googleSheetsApi = "v4-rev20240916-2.0.0"  # Latest
-googleCloudStorage = "2.44.0"
-googleAuthLibrary = "1.25.0"
-gsonVersion = "2.11.0"
-googleHttpClientGson = "1.44.2"  # Added for GsonFactory
+googleApiClient = "2.2.0"
+googleSheetsApi = "v4-rev20220927-2.0.0"
+googleCloudStorage = "2.34.0"
+googleAuthLibrary = "1.19.0"
+gsonVersion = "2.10.1"
 
-coilCompose = "2.7.0"  # Consolidated
-
+coilCompose = "2.6.0"
 [libraries]
 accompanist-navigation-animation = { module = "com.google.accompanist:accompanist-navigation-animation", version.ref = "accompanistNavigationAnimation" }
 android-image-cropper = { module = "com.vanniktech:android-image-cropper", version.ref = "androidImageCropper" }
@@ -37,7 +35,6 @@ google-api-services-sheets = { module = "com.google.apis:google-api-services-she
 google-cloud-storage = { module = "com.google.cloud:google-cloud-storage", version.ref = "googleCloudStorage" }
 google-auth-library-oauth2-http = { module = "com.google.auth:google-auth-library-oauth2-http", version.ref = "googleAuthLibrary" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gsonVersion" }
-google-http-client-gson = { module = "com.google.http-client:google-http-client-gson", version.ref = "googleHttpClientGson" }  # Added
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
