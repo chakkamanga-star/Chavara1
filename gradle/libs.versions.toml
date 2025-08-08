@@ -1,9 +1,10 @@
 [versions]
 accompanistNavigationAnimation = "0.34.0"
-agp = "8.6.0"  # Fixed to valid stable
+agp = "8.10.1"  # Valid stable
 androidImageCropper = "4.3.3"
-coilComposeVersion = "2.7.0"
 
+
+guava = "33.2.1-android"
 kotlin = "2.0.20"  # Fixed for unresolved 'kotlin'
 coreKtx = "1.16.0"
 junit = "4.13.2"
@@ -11,9 +12,11 @@ junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 lifecycleRuntimeKtx = "2.9.2"
 activityCompose = "1.10.1"
-composeBom = "2024.09.00"
-coil = "2.7.0"
-navigation = "2.7.5"
+composeBom = "2024.09.03"  # Updated to latest
+coil = "2.7.0"  # Consolidated, removed dupes
+lifecycleViewmodelCompose = "2.8.0" # This is used by both lifecycle compose libs below
+# ...
+
 navigationCompose = "2.7.7"
 
 googleApiClient = "2.2.0"
@@ -21,25 +24,36 @@ googleSheetsApi = "v4-rev20220927-2.0.0"
 googleCloudStorage = "2.34.0"
 googleAuthLibrary = "1.19.0"
 gsonVersion = "2.10.1"
+googleHttpClientGson = "1.45.0"
+kotlinxCoroutines = "1.7.3"
 
-coilCompose = "2.6.0"
+
 [libraries]
 accompanist-navigation-animation = { module = "com.google.accompanist:accompanist-navigation-animation", version.ref = "accompanistNavigationAnimation" }
 android-image-cropper = { module = "com.vanniktech:android-image-cropper", version.ref = "androidImageCropper" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
-androidx-navigation-compose-v277 = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
-coil-compose-v260 = { module = "io.coil-kt:coil-compose", version.ref = "coilComposeVersion" }
 
+
+
+androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycleViewmodelCompose" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleViewmodelCompose" }
 google-api-client-android = { module = "com.google.api-client:google-api-client-android", version.ref = "googleApiClient" }
 google-api-services-sheets = { module = "com.google.apis:google-api-services-sheets", version.ref = "googleSheetsApi" }
 google-cloud-storage = { module = "com.google.cloud:google-cloud-storage", version.ref = "googleCloudStorage" }
 google-auth-library-oauth2-http = { module = "com.google.auth:google-auth-library-oauth2-http", version.ref = "googleAuthLibrary" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gsonVersion" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+
+
+google-http-client-gson = { group = "com.google.http-client", name = "google-http-client-gson", version.ref = "googleHttpClientGson" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
-androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-ui = { group = "androidx.compose.ui", name = "ui" }
@@ -50,7 +64,7 @@ androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-man
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
-androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 androidx-compose-animation = { group ="androidx.compose.animation", name = "animation" }
 
 [plugins]

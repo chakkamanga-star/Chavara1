@@ -67,7 +67,14 @@ object ServiceAccountManager {
 
         // Parse JSON to ensure it's valid
         val gson = Gson()
-        val jsonObject = gson.fromJson(jsonString, JsonObject::class.java)
+        try {
+            gson.fromJson(jsonString, JsonObject::class.java) // Call for side effect (exception if invalid)
+        } catch (e: com.google.gson.JsonSyntaxException) {
+            // Optionally log or handle this specific validation failure before it's re-thrown
+            // or caught by the calling function's try-catch.
+            // For now, just rethrow to behave like before.
+            throw e
+        }
 
         // Convert back to InputStream for GoogleCredentials
         val credentialsStream = ByteArrayInputStream(jsonString.toByteArray())
@@ -80,6 +87,7 @@ object ServiceAccountManager {
     /**
      * Clear cached credentials (useful for testing or when credentials change)
      */
+    @Suppress("unused")
     fun clearCredentials() {
         sheetsCredentials = null
         gcsCredentials = null

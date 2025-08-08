@@ -1,6 +1,6 @@
 package com.sj9.chavara.data.service
 
-import android.content.Context
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -11,7 +11,7 @@ import java.util.UUID
 /**
  * Service for downloading images from URLs (including Google Drive links)
  */
-class ImageDownloadService(private val context: Context) {
+class ImageDownloadService {
 
     /**
      * Download image from URL and return byte array
@@ -90,7 +90,7 @@ class ImageDownloadService(private val context: Context) {
                 }
                 else -> ""
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             ""
         }
     }
@@ -116,7 +116,7 @@ class ImageDownloadService(private val context: Context) {
                 url.contains(".jpeg", ignoreCase = true) -> "jpeg"
                 else -> "jpg"
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             "jpg"
         }
     }

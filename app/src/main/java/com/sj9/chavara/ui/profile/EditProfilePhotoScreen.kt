@@ -40,7 +40,7 @@ import com.sj9.chavara.ui.utils.*
 fun EditProfilePhotoScreen(
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
+    LocalContext.current
     // State to hold the URI of the cropped image
     var croppedImageUri by remember { mutableStateOf<Uri?>(null) }
 

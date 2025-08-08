@@ -14,7 +14,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
-import com.sj9.chavara.R
+
 import com.sj9.chavara.ui.theme.ris
 import com.sj9.chavara.data.service.GcsImageLoader
 
@@ -146,20 +146,4 @@ private fun MemberInitials(
     )
 }
 
-@Composable
-fun MemberPhotoPlaceholder(
-    memberName: String,
-    modifier: Modifier = Modifier,
-    size: Dp = 120.dp,
-    cornerRadius: Dp = 20.dp
-) {
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(RoundedCornerShape(cornerRadius))
-            .background(Color(0xFF4EDAE9)),
-        contentAlignment = Alignment.Center
-    ) {
-        MemberInitials(memberName = memberName)
-    }
-}
+

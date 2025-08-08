@@ -37,7 +37,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import com.sj9.chavara.ui.theme.*
-
+import android.net.Uri
+import android.util.Log
 import androidx.compose.ui.graphics.Brush
 
 
@@ -286,7 +287,7 @@ fun AppNavigation(
 
         composable(AppDestinations.SPREADSHEET) {
             SpreadsheetScreen(
-                onSaveClick = {
+                onProcessComplete = {
                     navController.navigate(AppDestinations.SAVED)
                 },
                 modifier = Modifier
@@ -330,13 +331,18 @@ fun AppNavigation(
         }
 
         composable("${AppDestinations.FAMILY_MEMBER_PHOTO_EDIT}/{memberId}") { backStackEntry ->
-            val memberId = backStackEntry.arguments?.getString("memberId")?.toIntOrNull() ?: 0
+            val memberIdString = backStackEntry.arguments?.getString("memberId")
+            val memberId = memberIdString?.toIntOrNull() ?: 0
+            //    Example: Fetch from a ViewModel based on memberId.
+            val currentPhotoUri: Uri? = null
             FamilyMemberPhotoEditScreen(
+                modifier = Modifier, // Optional: if you have a specific modifier here
                 memberId = memberId,
-                onPhotoSelected = {
-                    navController.popBackStack()
-                },
-                modifier = Modifier
+                initialPhotoUri = currentPhotoUri,
+                onDoneEditing = {
+                    Log.d("AppNavigation", "Photo editing done for member $memberId. Navigating back.")
+                navController.popBackStack()
+            }
             )
         }
     }

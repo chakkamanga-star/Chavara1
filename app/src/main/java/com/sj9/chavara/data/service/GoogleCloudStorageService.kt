@@ -1,6 +1,7 @@
 package com.sj9.chavara.data.service
 
 import android.content.Context
+import android.util.Log
 import com.google.cloud.storage.BlobId
 import com.google.cloud.storage.BlobInfo
 import com.google.cloud.storage.Storage
@@ -13,6 +14,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Service class for interacting with Google Cloud Storage
+ * Handles low-level storage operations
  */
 class GoogleCloudStorageService(private val context: Context) {
 
@@ -45,23 +47,24 @@ class GoogleCloudStorageService(private val context: Context) {
     /**
      * Save family members data to Cloud Storage
      */
-    suspend fun saveFamilyMembers(familyMembers: List<FamilyMember>): Boolean = withContext(Dispatchers.IO) {
-        try {
-            return@withContext getStorage()?.let { storage ->
-                val json = gson.toJson(familyMembers)
-                val blobId = BlobId.of(bucketName, "family-members/family_members.json")
-                val blobInfo = BlobInfo.newBuilder(blobId)
-                    .setContentType("application/json")
-                    .build()
+    suspend fun saveFamilyMembers(familyMembers: List<FamilyMember>): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                return@withContext getStorage()?.let { storage ->
+                    val json = gson.toJson(familyMembers)
+                    val blobId = BlobId.of(bucketName, "family-members/family_members.json")
+                    val blobInfo = BlobInfo.newBuilder(blobId)
+                        .setContentType("application/json")
+                        .build()
 
-                storage.create(blobInfo, json.toByteArray())
-                true
-            } ?: false
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
+                    storage.create(blobInfo, json.toByteArray())
+                    true
+                } ?: false
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
+            }
         }
-    }
 
     /**
      * Load family members data from Cloud Storage
@@ -169,6 +172,7 @@ class GoogleCloudStorageService(private val context: Context) {
     /**
      * Save app settings/configuration
      */
+    @Suppress("UNUSED")  // Suppress if not used; remove if truly unused
     suspend fun saveAppSettings(settings: Map<String, Any>): Boolean = withContext(Dispatchers.IO) {
         try {
             return@withContext getStorage()?.let { storage ->
@@ -190,6 +194,7 @@ class GoogleCloudStorageService(private val context: Context) {
     /**
      * Load app settings/configuration
      */
+    @Suppress("UNUSED")  // Suppress if not used; remove if truly unused
     suspend fun loadAppSettings(): Map<String, Any> = withContext(Dispatchers.IO) {
         try {
             return@withContext getStorage()?.let { storage ->
@@ -237,4 +242,88 @@ class GoogleCloudStorageService(private val context: Context) {
     /**
      * Delete media file from Cloud Storage
      */
-    suspend fun
+    suspend fun deleteMediaFile(fileName: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            return@withContext getStorage()?.let { storage ->
+                val blobId = BlobId.of(bucketName, "media/$fileName")
+                storage.delete(blobId)
+                true
+            } ?: false
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /**
+     * Download file from Cloud Storage with custom bucket and path
+     */
+    suspend fun downloadFile(bucketName: String, objectPath: String): ByteArray? = withContext(Dispatchers.IO) {
+        try {
+            return@withContext getStorage()?.let { storage ->
+                val blobId = BlobId.of(bucketName, objectPath)
+                val blob = storage.get(blobId)
+
+                if (blob != null && blob.exists()) {
+                    blob.getContent()
+                } else {
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    /**
+     * Download file from default bucket
+     */
+    suspend fun downloadFileFromDefaultBucket(objectPath: String): ByteArray? =
+        withContext(Dispatchers.IO) {
+            try {
+                return@withContext getStorage()?.let { storage ->
+                    val blobId = BlobId.of(bucketName, objectPath) // Using the class property
+                    val blob = storage.get(blobId)
+
+                    if (blob != null && blob.exists()) {
+                        blob.getContent()
+                    } else {
+                        Log.w(
+                            "GCS_Service",
+                            "File not found or does not exist: gs://$bucketName/$objectPath"
+                        )
+                        null
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(
+                    "GCS_Service",
+                    "Error downloading file: gs://$bucketName/$objectPath",
+                    e
+                )
+                null
+            }
+        }
+
+    /**
+     * Reset all app data (for app reset functionality)
+     */
+    suspend fun resetAllData(): Boolean = withContext(Dispatchers.IO) {
+        try {
+            return@withContext getStorage()?.let { storage ->
+                // List all objects and delete them
+                val blobs = storage.list(bucketName).iterateAll()
+
+                for (blob in blobs) {
+                    storage.delete(blob.blobId)
+                }
+
+                true
+            } ?: false
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+}

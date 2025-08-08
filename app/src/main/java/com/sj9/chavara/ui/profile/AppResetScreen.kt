@@ -75,17 +75,17 @@ fun AppResetScreen(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    Color(0xFF4CAF50), // Green gradient for success
+                                    Color(0xFF4CAF50),
                                     Color(0xFF2E7D32)
                                 )
                             )
                         ),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center  // Moved here – correct parameter for Box (fixes "unresolved reference")
                 ) {
                     Text(
                         text = "The App Is Reset",
                         color = Color.White,
-                        fontSize = 32.sp,
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = ris
                     )
@@ -155,7 +155,7 @@ fun AppResetScreen(
                                             isResetting = false
                                         }
                                     }
-                                }
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Text(

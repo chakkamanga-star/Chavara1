@@ -1,16 +1,23 @@
 package com.sj9.chavara.ui.family
 
+import android.net.Uri // <-- Import Uri
+import androidx.activity.compose.rememberLauncherForActivityResult // <-- Import
+import androidx.activity.result.PickVisualMediaRequest // <-- Import
+import androidx.activity.result.contract.ActivityResultContracts // <-- Import
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -20,15 +27,40 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage // <-- Import AsyncImage
 import com.sj9.chavara.R
-import com.sj9.chavara.ui.theme.ris
+import com.sj9.chavara.ui.theme.ris // Make sure this import is correct
 
 @Composable
 fun FamilyMemberPhotoEditScreen(
-    memberId: Int = 0,
-    onPhotoSelected: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    memberId: Int,
+    // This lambda is now for when the whole process is done, e.g., after saving the new photo
+    onDoneEditing: () -> Unit = {},
+    // You might want to pass the initial photo URI if it's already set
+    initialPhotoUri: Uri? = null
 ) {
+    Log.d("PhotoEditScreen", "Editing photo for member ID: $memberId")
+
+    // 1. State for the selected image URI
+    var selectedImageUri by remember { mutableStateOf(initialPhotoUri) }
+
+    // 2. Photo Picker Launcher
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri ->
+            if (uri != null) {
+                selectedImageUri = uri
+                Log.d("PhotoEditScreen", "Photo selected: $uri")
+                // Here, you might want to trigger a save operation or directly call onDoneEditing
+                // For now, let's assume selecting a photo means it's "complete" for this screen's purpose.
+                // If you need a separate save button, you'd call onDoneEditing from that button's click.
+            } else {
+                Log.d("PhotoEditScreen", "No photo selected")
+            }
+        }
+    )
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -42,12 +74,6 @@ fun FamilyMemberPhotoEditScreen(
                 )
             )
     ) {
-        // Status Bar
-
-
-        // Bottom Home Bar
-
-
         // Background card
         Box(
             modifier = Modifier
@@ -65,53 +91,87 @@ fun FamilyMemberPhotoEditScreen(
                 )
         )
 
-        // Photo area with gradient
+        // Photo area - This will now contain the AsyncImage or placeholder
         Box(
             modifier = Modifier
                 .offset(x = 67.dp, y = 282.dp)
                 .size(width = 288.dp, height = 354.dp)
                 .rotate(-0.143f)
+                .clip(RoundedCornerShape(20.dp)) // Clip before background for rounded corners
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
                             Color(0xFF4EDAE9),
                             Color(0xFF0F4248)
                         )
-                    ),
-                    shape = RoundedCornerShape(20.dp)
+                    )
                 )
-        )
+                .clickable { // Make the whole area clickable to change photo
+                    Log.d("PhotoEditScreen", "Photo area clicked, launching picker.")
+                    photoPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+            contentAlignment = Alignment.Center // Center content like image or text
+        ) {
+            // 3. Conditional Image Display
+            if (selectedImageUri != null) {
+                AsyncImage(
+                    model = selectedImageUri,
+                    contentDescription = "Family Member Photo",
+                    modifier = Modifier.fillMaxSize(), // Fill the photo area
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                // Display the placeholder "Jesus" image or "Add Photo" text
+                Image(
+                    painter = painterResource(id = R.drawable.jesus), // Or a generic placeholder
+                    contentDescription = "Tap to add photo",
+                    modifier = Modifier
+                        .fillMaxSize() // Fill the photo area
+                        .alpha(0.8f), // Adjust alpha as needed
+                    contentScale = ContentScale.Crop
+                )
+                // Optionally, add a text overlay like "Tap to change"
+                Text(
+                    text = "Tap to change",
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontFamily = ris,
+                    fontSize = 18.sp,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)
+                )
+            }
+        }
 
-        // Jesus image overlay
-        Image(
-            painter = painterResource(id = R.drawable.jesus),
-            contentDescription = null,
-            modifier = Modifier
-                .offset(x = 18.dp, y = 212.dp)
-                .size(width = 388.dp, height = 640.dp)
-                .aspectRatio(.8f)
-                .alpha(2f),
-            contentScale = ContentScale.Crop
-        )
-
-        // Change Photo text
+        // "Change Photo" text - can now be a "Done" or "Save" button if needed,
+        // or removed if the main photo area click is enough.
+        // For simplicity, let's make this a "Done" button that calls onDoneEditing.
+        // If you want the photo to be "saved" automatically on selection, this text might not be needed
+        // or could serve a different purpose.
         Text(
-            text = "Change Photo",
+            text = "Done", // Changed text
             color = Color.White,
             fontFamily = ris,
             fontSize = 33.sp,
             fontWeight = FontWeight.Normal,
             modifier = Modifier
-                .offset(x = 115.dp, y = 584.dp)
-                .size(width = 294.dp, height = 81.dp)
-                .clickable { onPhotoSelected() }
+                .align(Alignment.BottomCenter) // Align to bottom center for better placement
+                .padding(bottom = 70.dp) // Adjust padding
+                .clickable {
+                    Log.d("PhotoEditScreen", "Done button clicked.")
+                    // Here you would typically save the selectedImageUri if needed,
+                    // then call onDoneEditing.
+                    // For example: viewModel.saveFamilyMemberPhoto(memberId, selectedImageUri)
+                    onDoneEditing() // This will now pop the back stack as defined in navigation
+                }
         )
     }
 }
 
-
 @Preview(showBackground = true, widthDp = 412, heightDp = 917)
 @Composable
 fun FamilyMemberPhotoEditScreenPreview() {
-    FamilyMemberPhotoEditScreen()
+    // ChavaraTheme { // Assuming you have a theme
+    FamilyMemberPhotoEditScreen(memberId = 0, onDoneEditing = {})
+    // }
 }

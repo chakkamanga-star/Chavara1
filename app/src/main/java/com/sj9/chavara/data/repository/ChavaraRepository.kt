@@ -2,16 +2,19 @@ package com.sj9.chavara.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
+import androidx.core.content.edit // Add for KTX extension
 import com.sj9.chavara.data.model.FamilyMember
 import com.sj9.chavara.data.service.GoogleCloudStorageService
 import com.sj9.chavara.data.service.GoogleSheetsService
+import com.sj9.chavara.data.service.SheetRowData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlin.Result // Added import for Result
 
 /**
  * Repository class for managing app data and synchronization with cloud services
+ * Handles business logic and state management
  */
 class ChavaraRepository(private val context: Context) {
 
@@ -47,11 +50,11 @@ class ChavaraRepository(private val context: Context) {
         _isLoading.value = true
         try {
             // Load data from cloud storage if available
-            if (googleCloudStorageService != null) {
-                val members = googleCloudStorageService.loadFamilyMembers()
+            googleCloudStorageService?.let { service ->
+                val members = service.loadFamilyMembers()
                 _familyMembers.value = members
 
-                val profile = googleCloudStorageService.loadUserProfile()
+                val profile = service.loadUserProfile()
                 _userProfile.value = profile
             }
         } catch (e: Exception) {
@@ -61,9 +64,6 @@ class ChavaraRepository(private val context: Context) {
         }
     }
 
-    /**
-     * Fetch data from Google Sheets and sync with cloud storage
-     */
     suspend fun fetchDataFromSpreadsheet(
         spreadsheetUrl: String,
         onProgress: (String) -> Unit = {}
@@ -81,7 +81,8 @@ class ChavaraRepository(private val context: Context) {
             }
 
             // Fetch data from sheets with progress updates
-            val newMembers = googleSheetsService.fetchFamilyMembers(spreadsheetUrl, onProgress)
+            val rawSheetData = googleSheetsService.fetchRawSheetData(spreadsheetUrl, onProgress)
+            val newMembers = transformSheetDataToFamilyMembers(rawSheetData)
 
             if (newMembers.isNotEmpty()) {
                 // Save to cloud storage
@@ -91,11 +92,11 @@ class ChavaraRepository(private val context: Context) {
                     // Update local state
                     _familyMembers.value = newMembers
 
-                    // Save spreadsheet URL for future reference
-                    sharedPrefs.edit()
-                        .putString("last_spreadsheet_url", spreadsheetUrl)
-                        .putLong("last_sync_time", System.currentTimeMillis())
-                        .apply()
+                    // Save spreadsheet URL for future reference (using KTX)
+                    sharedPrefs.edit {
+                        putString("last_spreadsheet_url", spreadsheetUrl)
+                        putLong("last_sync_time", System.currentTimeMillis())
+                    }
 
                     Result.success("Successfully loaded ${newMembers.size} members")
                 } else {
@@ -127,12 +128,12 @@ class ChavaraRepository(private val context: Context) {
     }
 
     /**
-     * Add or update family member
+     * Add or update family member with state management
      */
     suspend fun saveFamilyMember(member: FamilyMember): Boolean {
         return try {
             // Save to cloud storage if available
-            if (googleCloudStorageService == null) return false
+            val googleCloudStorageService = this.googleCloudStorageService ?: return false
 
             val saved = googleCloudStorageService.saveFamilyMember(member)
 
@@ -161,12 +162,12 @@ class ChavaraRepository(private val context: Context) {
     }
 
     /**
-     * Delete family member
+     * Delete family member with state management
      */
     suspend fun deleteFamilyMember(memberId: Int): Boolean {
         return try {
             // Delete from cloud storage if available
-            if (googleCloudStorageService == null) return false
+            val googleCloudStorageService = this.googleCloudStorageService ?: return false
 
             val deleted = googleCloudStorageService.deleteFamilyMember(memberId)
 
@@ -188,11 +189,11 @@ class ChavaraRepository(private val context: Context) {
     }
 
     /**
-     * Save user profile
+     * Save user profile with state management
      */
     suspend fun saveUserProfile(profile: FamilyMember): Boolean {
         return try {
-            if (googleCloudStorageService == null) return false
+            val googleCloudStorageService = this.googleCloudStorageService ?: return false
 
             val saved = googleCloudStorageService.saveUserProfile(profile.copy(isCurrentUserProfile = true))
 
@@ -208,29 +209,27 @@ class ChavaraRepository(private val context: Context) {
     }
 
     /**
-     * Reset all app data
+     * Reset all app data with state management
      */
     suspend fun resetAppData(): Boolean {
         return try {
-            // Reset cloud storage if available
-            val cloudReset = if (googleCloudStorageService != null) {
-                googleCloudStorageService.resetAllData()
-            } else {
-                true // If no cloud service, just reset local
-            }
+            val cloudReset = googleCloudStorageService?.resetAllData() ?: true
 
             if (cloudReset) {
                 // Clear local state
                 _familyMembers.value = emptyList()
                 _userProfile.value = null
 
-                // Clear shared preferences
-                sharedPrefs.edit().clear().apply()
+                // Clear SharedPreferences using KTX
+                sharedPrefs.edit { clear() }
+                Log.d("ChavaraRepo", "Local data reset successfully.")
+            } else {
+                Log.w("ChavaraRepo", "Cloud data reset failed. Local data NOT reset to prevent inconsistency.")
             }
 
             cloudReset
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("ChavaraRepo", "Exception during resetAppData", e)
             false
         }
     }
@@ -240,6 +239,27 @@ class ChavaraRepository(private val context: Context) {
      */
     fun getMemberById(id: Int): FamilyMember? {
         return _familyMembers.value.find { it.id == id }
+    }
+
+    /**
+     * Transform raw sheet data to FamilyMember objects
+     */
+    private fun transformSheetDataToFamilyMembers(rawSheetData: List<SheetRowData>): List<FamilyMember> {
+        return rawSheetData.mapIndexed { index, sheetRow ->
+            FamilyMember(
+                id = index + 1, // Generate sequential IDs
+                name = sheetRow.name,
+                course = sheetRow.course,
+                birthday = sheetRow.birthday,
+                phoneNumber = sheetRow.phoneNumber,
+                residence = sheetRow.residence,
+                emailAddress = sheetRow.emailAddress,
+                chavaraPart = sheetRow.chavaraPart,
+                photoUrl = sheetRow.originalPhotoUrl,
+                videoUrl = sheetRow.originalVideoUrl,
+                isCurrentUserProfile = false
+            )
+        }
     }
 
     /**

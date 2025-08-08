@@ -94,6 +94,8 @@ fun GalleryPhotosScreen(
             }
 
             // Photos grid - responsive adaptive grid
+
+
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 modifier = Modifier
