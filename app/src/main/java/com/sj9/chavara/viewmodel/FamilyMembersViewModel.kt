@@ -6,7 +6,6 @@ import com.sj9.chavara.data.model.FamilyMember
 import com.sj9.chavara.data.repository.ChavaraRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -15,23 +14,18 @@ class FamilyMembersViewModel(
     private val repository: ChavaraRepository
 ) : ViewModel() {
 
-    val familyMembers = repository.familyMembers.asStateFlow()
-    val isLoading = repository.isLoading.asStateFlow()
-    val userProfile = repository.userProfile.asStateFlow()
+    // FIX: Removed the redundant .asStateFlow() calls
+    val familyMembers: StateFlow<List<FamilyMember>> = repository.familyMembers
+    val isLoading: StateFlow<Boolean> = repository.isLoading
+    val userProfile: StateFlow<FamilyMember?> = repository.userProfile
 
-    val todaysBirthdays = repository.familyMembers.map {
+    val todaysBirthdays: StateFlow<List<FamilyMember>> = repository.familyMembers.map {
         repository.getTodaysBirthdayMembers()
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    fun loadDataFromSpreadsheet(url: String) {
-        viewModelScope.launch {
-            repository.fetchDataFromSpreadsheet(url) { progress ->
-                // Handle progress updates if needed
-            }
-        }
+    fun getMembersByMonth(): Map<Int, List<FamilyMember>> {
+        return repository.getMembersByMonth()
     }
-
-    fun getMembersByMonth() = repository.getMembersByMonth()
 
     fun saveFamilyMember(member: FamilyMember) {
         viewModelScope.launch {
@@ -48,6 +42,4 @@ class FamilyMembersViewModel(
     fun getMemberById(id: Int): FamilyMember? {
         return repository.getMemberById(id)
     }
-
-    fun getLastSyncInfo() = repository.getLastSyncInfo()
 }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,64 +18,41 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sj9.chavara.R
-import com.sj9.chavara.ui.theme.ris
 import com.sj9.chavara.data.model.FamilyMember
-import com.sj9.chavara.data.repository.ChavaraRepository
 import com.sj9.chavara.ui.components.AsyncMemberImage
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.sj9.chavara.ui.theme.ris
+import com.sj9.chavara.viewmodel.FamilyMembersViewModel
 
 @Composable
 fun FamilyMembersListScreen(
+    viewModel: FamilyMembersViewModel, // ViewModel is now passed in
     onMemberClick: (FamilyMember) -> Unit = {},
     onAddMemberClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
+    // Collect the state from the ViewModel
+    val familyMembers by viewModel.familyMembers.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
-    // Make repository initialization safe
-    val repository = remember {
-        try {
-            ChavaraRepository(context)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
-    }
-
-    // Collect family members from repository safely
-    val familyMembers by (repository?.familyMembers ?: MutableStateFlow(emptyList())).collectAsState()
-
-    // Initialize repository safely
-    LaunchedEffect(repository) {
-        try {
-            repository?.initialize()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFF4BC9D7), // #4BC9D7
-                        Color(0xFF26767E), // #26767E at 49.52%
-                        Color(0xFF0A1E20)  // #0A1E20
-                    ),
-                    startY = 0f,
-                    endY = Float.POSITIVE_INFINITY
+                        Color(0xFF4BC9D7),
+                        Color(0xFF26767E),
+                        Color(0xFF0A1E20)
+                    )
                 )
             )
     ) {
-        // Background Jesus image with opacity
         Image(
             painter = painterResource(id = R.drawable.jesus),
             contentDescription = null,
@@ -85,23 +63,51 @@ fun FamilyMembersListScreen(
             contentScale = ContentScale.Crop
         )
 
-        // Penguin icon container - positioned based on member count
-        Box(
-            modifier = Modifier
-                .let {
-                    if (familyMembers.isEmpty()) {
-                        // Center the penguin when no members
-                        it.fillMaxSize()
-                    } else {
-                        // Top-right position when members exist
-                        it.offset(x = 336.dp, y = 18.dp)
+        if (isLoading && familyMembers.isEmpty()) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+        } else {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Text(
+                    text = "Members",
+                    color = Color.Black,
+                    fontFamily = ris,
+                    fontSize = 49.sp,
+                    fontWeight = FontWeight.Normal,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(top = 103.dp)
+                )
+
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp, vertical = 198.dp),
+                    horizontalArrangement = Arrangement.spacedBy(31.dp),
+                    verticalArrangement = Arrangement.spacedBy(23.dp)
+                ) {
+                    items(familyMembers) { member ->
+                        FamilyMemberCard(
+                            member = member,
+                            onClick = { onMemberClick(member) }
+                        )
+                    }
+                    item {
+                        AddMemberCard(onClick = onAddMemberClick)
                     }
                 }
+            }
+        }
+
+        // "Add Member" button
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 18.dp, end = 20.dp)
                 .size(width = 56.dp, height = 68.dp)
                 .clickable { onAddMemberClick() },
-            contentAlignment = if (familyMembers.isEmpty()) Alignment.Center else Alignment.TopStart
+            contentAlignment = Alignment.Center
         ) {
-            // Gradient background for penguin container
             Box(
                 modifier = Modifier
                     .size(width = 56.dp, height = 68.dp)
@@ -116,55 +122,12 @@ fun FamilyMembersListScreen(
                         shape = RoundedCornerShape(20.dp)
                     )
             )
-
-            // Penguin icon
             Image(
                 painter = painterResource(id = R.drawable.penguin),
                 contentDescription = "Add Member",
-                modifier = Modifier
-
-                    .size(width = 47.dp, height = 51.dp),
+                modifier = Modifier.size(width = 47.dp, height = 51.dp),
                 contentScale = ContentScale.Fit
             )
-        }
-
-        // Show Members title and grid only when members exist
-        if (familyMembers.isNotEmpty()) {
-            // Members title
-            Text(
-                text = "Members",
-                color = Color.Black,
-                fontFamily = ris,
-                fontSize = 49.sp,
-                fontWeight = FontWeight.Normal,
-                modifier = Modifier
-                    .offset(x = 112.dp, y = 103.dp)
-                    .size(width = 188.dp, height = 57.dp)
-            )
-
-            // Family members grid
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                modifier = Modifier
-                    .offset(x = 20.dp, y = 198.dp)
-                    .size(width = 372.dp, height = 650.dp),
-                horizontalArrangement = Arrangement.spacedBy(31.dp),
-                verticalArrangement = Arrangement.spacedBy(23.dp)
-            ) {
-                items(familyMembers) { member ->
-                    FamilyMemberCard(
-                        member = member,
-                        onClick = { onMemberClick(member) }
-                    )
-                }
-
-                // Add member card (if there's space for more)
-                if (familyMembers.size < 6) {
-                    item {
-                        AddMemberCard(onClick = onAddMemberClick)
-                    }
-                }
-            }
         }
     }
 }
@@ -191,7 +154,6 @@ private fun FamilyMemberCard(
             ),
         contentAlignment = Alignment.Center
     ) {
-        // Show actual member photo or initials as fallback
         AsyncMemberImage(
             imageUrl = member.photoUrl,
             memberName = member.name,
@@ -229,21 +191,4 @@ private fun AddMemberCard(
             fontWeight = FontWeight.Normal
         )
     }
-}
-
-private fun getSampleFamilyMembers(): List<FamilyMember> {
-    return listOf(
-        FamilyMember(1, "John"),
-        FamilyMember(2, "Mary"),
-        FamilyMember(3, "David"),
-        FamilyMember(4, "Sarah"),
-        FamilyMember(5, "Michael"),
-        FamilyMember(6, "Anna")
-    )
-}
-
-@Preview(showBackground = true, widthDp = 412, heightDp = 917)
-@Composable
-fun FamilyMembersListScreenPreview() {
-    FamilyMembersListScreen()
 }
