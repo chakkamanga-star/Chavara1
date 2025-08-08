@@ -17,7 +17,18 @@ data class FamilyMember(
     val isCurrentUserProfile: Boolean = false
 ) {
     // Helper function to get birth month for organizing by month
-
+    fun getBirthMonth(): Int {
+        return try {
+            val parts = birthday.split("/")
+            if (parts.size >= 2) {
+                parts[1].toInt()
+            } else {
+                0
+            }
+        } catch (e: Exception) {
+            0
+        }
+    }
 
     // Helper function to check if today is birthday
     fun isBirthdayToday(): Boolean {
@@ -27,9 +38,9 @@ data class FamilyMember(
                 val currentDate = java.util.Calendar.getInstance()
                 val birthDay = parts[0].toInt()
                 val birthMonth = parts[1].toInt()
-                
+
                 currentDate.get(java.util.Calendar.DAY_OF_MONTH) == birthDay &&
-                (currentDate.get(java.util.Calendar.MONTH) + 1) == birthMonth
+                        (currentDate.get(java.util.Calendar.MONTH) + 1) == birthMonth
             } else false
         } catch (e: Exception) {
             false
