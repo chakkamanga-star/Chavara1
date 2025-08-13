@@ -308,7 +308,7 @@ private fun BirthdayMemberCard(
             )
 
             Text(
-                text = member.getFormattedBirthday().split("/").take(2).joinToString("/"),
+                text = member.birthday.split("/").take(2).joinToString("/"),
                 color = Color.Gray,
                 fontSize = 8.sp,
                 maxLines = 1

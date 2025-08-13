@@ -1,5 +1,6 @@
 package com.sj9.chavara.ui.calendar
 
+import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -16,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -37,13 +37,12 @@ import com.canhub.cropper.CropImageContractOptions
 import com.canhub.cropper.CropImageOptions
 import com.canhub.cropper.CropImageView
 import com.sj9.chavara.R
-import android.content.Intent
+import com.sj9.chavara.data.model.FamilyMember
+import com.sj9.chavara.data.repository.ChavaraRepository
 import com.sj9.chavara.ui.theme.ChavaraTheme
+import com.sj9.chavara.viewmodel.CalendarViewModel
 import java.text.SimpleDateFormat
 import java.util.*
-import com.sj9.chavara.data.model.FamilyMember
-import com.sj9.chavara.viewmodel.CalendarViewModel
-import com.sj9.chavara.data.repository.ChavaraRepository
 
 @Composable
 fun CalendarScreen(
@@ -60,15 +59,21 @@ fun CalendarScreen(
     val selectedDate by viewModel.selectedDate.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val birthdayEventsByMonth by viewModel.birthdayEventsByMonth.collectAsState()
+    val upcomingBirthdays by viewModel.upcomingBirthdays.collectAsState()
+
+    // Refresh data on initial composition
+    LaunchedEffect(Unit) {
+        viewModel.refreshCalendarData()
+    }
 
     val context = LocalContext.current
     var croppedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var currentMonth by remember { mutableStateOf(Calendar.getInstance()) }
 
     val cropImageLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
         if (result.isSuccessful) {
             Log.d("CalendarScreen", "Cropped URI: ${result.uriContent}")
             croppedImageUri = result.uriContent
-            // Optional: Persist URI access if you need to save it long-term
             result.uriContent?.let { uri ->
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
@@ -77,7 +82,6 @@ fun CalendarScreen(
         }
     }
 
-    // NEW: Use modern Photo Picker (replaces GetContent)
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
@@ -221,17 +225,28 @@ fun CalendarScreen(
             }
 
             CalendarMonthView(
-                monthCalendar = Calendar.getInstance(),
+                monthCalendar = currentMonth,
                 onDateClick = { calendar ->
-                    // Format the date and pass to ViewModel
                     val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
                     val dateString = dateFormat.format(calendar.time)
                     viewModel.selectDate(dateString)
-
-                    // Also call the original onDateClick callback
                     onDateClick(calendar)
                 },
                 birthdayEvents = birthdayEventsByMonth,
+                onPreviousMonth = {
+                    val newCalendar = Calendar.getInstance().apply {
+                        time = currentMonth.time
+                        add(Calendar.MONTH, -1)
+                    }
+                    currentMonth = newCalendar
+                },
+                onNextMonth = {
+                    val newCalendar = Calendar.getInstance().apply {
+                        time = currentMonth.time
+                        add(Calendar.MONTH, 1)
+                    }
+                    currentMonth = newCalendar
+                },
                 modifier = Modifier.padding(top = 20.dp)
             )
 
@@ -256,6 +271,47 @@ fun CalendarScreen(
                     }
                 }
             }
+
+            // Show upcoming birthdays
+            if (upcomingBirthdays.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Upcoming Birthdays (Next 30 days):",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                upcomingBirthdays.forEach { member ->
+                    Text(
+                        text = "• ${member.name} on ${member.birthday}",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(start = 16.dp)
+                    )
+                }
+            }
+
+            // Show today's birthdays
+            val todaysBirthdays = viewModel.getTodaysBirthdays()
+            if (todaysBirthdays.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Today's Birthdays:",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                todaysBirthdays.forEach { member ->
+                    Text(
+                        text = "• ${member.name}",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(start = 16.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -266,11 +322,12 @@ private fun CalendarMonthView(
     monthCalendar: Calendar,
     onDateClick: (Calendar) -> Unit,
     birthdayEvents: Map<Int, List<FamilyMember>> = emptyMap(),
-    onPreviousMonth: () -> Unit = {},
-    onNextMonth: () -> Unit = {}
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit
 ) {
     val daysInMonth = monthCalendar.getActualMaximum(Calendar.DAY_OF_MONTH)
     val monthName = monthCalendar.getDisplayName(Calendar.MONTH, Calendar.LONG, Locale.getDefault()) ?: "Month"
+    val monthInt = monthCalendar.get(Calendar.MONTH) + 1
 
     Column(
         modifier = modifier
@@ -307,6 +364,7 @@ private fun CalendarMonthView(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Note: 5 columns is unconventional for calendars (typically 7 for weekdays). Consider changing to GridCells.Fixed(7) if needed.
         LazyVerticalGrid(
             columns = GridCells.Fixed(5),
             modifier = Modifier
@@ -316,18 +374,14 @@ private fun CalendarMonthView(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items((1..daysInMonth).toList()) { day ->
-                // Check if this day has birthday events
+                val hasBirthday = birthdayEvents[monthInt]?.any { member ->
+                    member.getBirthDay() == day
+                } ?: false
+
                 val dayCalendar = Calendar.getInstance().apply {
                     set(Calendar.YEAR, monthCalendar.get(Calendar.YEAR))
                     set(Calendar.MONTH, monthCalendar.get(Calendar.MONTH))
                     set(Calendar.DAY_OF_MONTH, day)
-                }
-
-                // Check if this specific day has any birthdays
-                val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                val dateString = dateFormat.format(dayCalendar.time)
-                val hasBirthday = birthdayEvents.values.flatten().any { member ->
-                    member.birthday == dateString
                 }
 
                 CalendarDateButton(
@@ -356,7 +410,6 @@ private fun CalendarDateButton(
             .alpha(0.8f)
             .background(
                 if (hasBirthday) {
-                    // Different gradient for days with birthdays
                     Brush.verticalGradient(
                         0.0f to Color(0xFF4CAF50),
                         0.4231f to Color(0xFF2E7D32),
@@ -404,7 +457,6 @@ private fun CalendarDateButton(
 @Composable
 fun CalendarScreenPreview() {
     ChavaraTheme {
-        // For preview, create a mock repository
         val context = LocalContext.current
         CalendarScreen(repository = ChavaraRepository(context))
     }

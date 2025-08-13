@@ -57,22 +57,6 @@ fun getResponsivePadding(small: Dp = 16.dp, medium: Dp = 20.dp, large: Dp = 24.d
 }
 
 /**
- * Get responsive width as a fraction of screen width
- */
-@Composable
-fun BoxWithConstraintsScope.responsiveWidth(fraction: Float): Dp {
-    return maxWidth * fraction
-}
-
-/**
- * Get responsive height as a fraction of screen height
- */
-@Composable
-fun BoxWithConstraintsScope.responsiveHeight(fraction: Float): Dp {
-    return maxHeight * fraction
-}
-
-/**
  * Get responsive font size based on screen width
  */
 @Composable

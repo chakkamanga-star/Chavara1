@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
  */
 class GoogleCloudStorageService(private val context: Context) {
 
-    private val bucketName = "chavara-youth-data" // Replace with your actual bucket name
+    private val bucketName = "chakka" // Replace with your actual bucket name
     private val gson = Gson()
 
     private var _storage: Storage? = null

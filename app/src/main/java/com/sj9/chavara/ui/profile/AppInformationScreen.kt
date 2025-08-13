@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sj9.chavara.ui.theme.ChavaraTheme
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Alignment.Companion.Center
+
 
 @Composable
 fun AppInformationScreen(
@@ -58,7 +58,7 @@ fun AppInformationScreen(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color(0xB899123D4), // rgba(153, 35, 212, 0.72)
+                                Color(0x898F2ACC), // rgba(153, 35, 212, 0.72)
                                 Color(0xA8872EB3), // rgba(135, 46, 179, 0.66)
                                 Color(0xB961307A), // rgba(97, 48, 122, 0.72)
                                 Color(0xB94F126E)  // rgba(79, 18, 110, 0.72)
@@ -95,7 +95,7 @@ fun AppInformationScreen(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color(0xB899123D4), // rgba(153, 35, 212, 0.72)
+                                Color(0x899934D7), // rgba(153, 35, 212, 0.72)
                                 Color(0xA8872EB3), // rgba(135, 46, 179, 0.66)
                                 Color(0xB961307A), // rgba(97, 48, 122, 0.72)
                                 Color(0xB94F126E)  // rgba(79, 18, 110, 0.72)

@@ -1,7 +1,5 @@
 package com.sj9.chavara.data.model
 
-import java.util.Date
-
 data class FamilyMember(
     val id: Int = 0,
     val name: String = "",
@@ -25,7 +23,21 @@ data class FamilyMember(
             } else {
                 0
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
+            0
+        }
+    }
+
+    // Helper function to get birth day for highlighting
+    fun getBirthDay(): Int {
+        return try {
+            val parts = birthday.split("/")
+            if (parts.isNotEmpty()) {
+                parts[0].toInt()
+            } else {
+                0
+            }
+        } catch (_: Exception) {
             0
         }
     }
@@ -42,23 +54,8 @@ data class FamilyMember(
                 currentDate.get(java.util.Calendar.DAY_OF_MONTH) == birthDay &&
                         (currentDate.get(java.util.Calendar.MONTH) + 1) == birthMonth
             } else false
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
-        }
-    }
-
-    // Helper function to get formatted birthday for display
-    fun getFormattedBirthday(): String {
-        return try {
-            val parts = birthday.split("/")
-            if (parts.size >= 3) {
-                val day = parts[0].padStart(2, '0')
-                val month = parts[1].padStart(2, '0')
-                val year = parts[2]
-                "$day/$month/$year"
-            } else birthday
-        } catch (e: Exception) {
-            birthday
         }
     }
 }

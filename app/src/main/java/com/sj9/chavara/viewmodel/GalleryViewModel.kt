@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.sj9.chavara.data.model.FamilyMember
 import com.sj9.chavara.data.repository.ChavaraRepository
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 
 import java.text.SimpleDateFormat
 import java.util.*
@@ -57,7 +58,19 @@ class GalleryViewModel(
     fun setFilter(filter: GalleryFilter) {
         _galleryFilter.value = filter
     }
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    init {
+        // Use viewModelScope.launch to start a coroutine
+        viewModelScope.launch {
+            // This coroutine will collect from the familyMembers flow
+            repository.familyMembers.collect { members ->
+                // Once we receive the list of members, loading is complete.
+                _isLoading.value = false
+            }
+        }
+    }
     // Helper functions that were in GalleryManager
     private val monthNames = arrayOf(
         "January", "February", "March", "April", "May", "June",
@@ -68,7 +81,7 @@ class GalleryViewModel(
         return try {
             val monthIndex = birthday.split("/")[1].toInt()
             if (monthIndex in 1..12) monthNames[monthIndex - 1] else "Unknown"
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             "Unknown"
         }
     }
@@ -76,7 +89,7 @@ class GalleryViewModel(
     private fun getDayOfMonth(birthday: String): Int {
         return try {
             birthday.split("/")[0].toInt()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             0
         }
     }
@@ -95,7 +108,7 @@ class GalleryViewModel(
             } else {
                 member.birthday
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             member.birthday
         }
     }

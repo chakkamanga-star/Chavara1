@@ -13,7 +13,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -31,7 +30,9 @@ fun GalleryMembersScreen(
     viewModel: GalleryViewModel,
     modifier: Modifier = Modifier
 ) {
+    // Collect state from the ViewModel
     val membersByMonth by viewModel.membersWithMediaByMonth.collectAsState()
+    // FIX: isLoading is a property of the viewModel
     val isLoading by viewModel.isLoading.collectAsState()
 
     val backgroundGradient = Brush.linearGradient(
@@ -79,6 +80,7 @@ fun GalleryMembersScreen(
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
+                    // FIX: Correctly iterate over the map entries
                     items(membersByMonth.entries.toList()) { (month, members) ->
                         MonthSection(
                             monthName = month,
@@ -108,14 +110,15 @@ private fun MonthSection(
             fontFamily = ris,
             modifier = Modifier.padding(bottom = 12.dp)
         )
+        // This setup with a fixed height and disabled scrolling is fine for your design
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 800.dp), // Allow grid to expand
+                .heightIn(max = 800.dp), // Allow grid to expand based on content
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            userScrollEnabled = false // Disable scrolling within the inner grid
+            userScrollEnabled = false // Inner grid doesn't scroll
         ) {
             items(members) { member ->
                 MemberPhotoCard(member = member, viewModel = viewModel)

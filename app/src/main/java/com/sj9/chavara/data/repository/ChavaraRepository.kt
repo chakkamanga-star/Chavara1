@@ -7,31 +7,28 @@ import androidx.core.content.edit
 import com.sj9.chavara.data.model.FamilyMember
 import com.sj9.chavara.data.service.GoogleCloudStorageService
 import com.sj9.chavara.data.service.GoogleSheetsService
-import com.sj9.chavara.data.service.ImageDownloadService // Import the service
+import com.sj9.chavara.data.service.ImageDownloadService
 import com.sj9.chavara.data.service.SheetRowData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+
 class ChavaraRepository(private val context: Context) {
 
     private val sharedPrefs: SharedPreferences =
         context.getSharedPreferences("chavara_prefs", Context.MODE_PRIVATE)
-
-    // Instantiate the ImageDownloadService
     private val imageDownloadService = ImageDownloadService()
 
     private val googleSheetsService = try {
         GoogleSheetsService(context)
-    } catch (e: Exception) {
-        e.printStackTrace()
+    } catch (_: Exception) {
         null
     }
 
     private val googleCloudStorageService = try {
         GoogleCloudStorageService(context)
-    } catch (e: Exception) {
-        e.printStackTrace()
+    } catch (_: Exception) {
         null
     }
 
@@ -53,8 +50,8 @@ class ChavaraRepository(private val context: Context) {
                 val profile = service.loadUserProfile()
                 _userProfile.value = profile
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (_: Exception) {
+            // Log the exception if needed, but don't crash
         } finally {
             _isLoading.value = false
         }
@@ -78,7 +75,6 @@ class ChavaraRepository(private val context: Context) {
             var newMembers = transformSheetDataToFamilyMembers(rawSheetData)
 
             if (newMembers.isNotEmpty()) {
-                // --- NEW LOGIC TO DOWNLOAD AND UPLOAD IMAGES ---
                 onProgress("Downloading and saving member photos...")
                 newMembers = newMembers.map { member ->
                     if (imageDownloadService.isValidImageUrl(member.photoUrl)) {
@@ -87,19 +83,17 @@ class ChavaraRepository(private val context: Context) {
                             val fileName = imageDownloadService.generateImageFileName(member.photoUrl, member.id)
                             val gcsUrl = googleCloudStorageService.uploadMediaFile(fileName, imageData, "image/jpeg")
                             if (gcsUrl != null) {
-                                // Return a new FamilyMember object with the updated GCS URL
                                 member.copy(photoUrl = gcsUrl)
                             } else {
-                                member // Return original member if upload fails
+                                member
                             }
                         } else {
-                            member // Return original member if download fails
+                            member
                         }
                     } else {
-                        member // Return original member if URL is not valid
+                        member
                     }
                 }
-                // --- END OF NEW LOGIC ---
 
                 val saved = googleCloudStorageService.saveFamilyMembers(newMembers)
                 if (saved) {
@@ -116,7 +110,7 @@ class ChavaraRepository(private val context: Context) {
                 Result.failure(Exception("No data found in the spreadsheet"))
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("ChavaraRepo", "Error during spreadsheet fetch: ${e.message}")
             Result.failure(e)
         } finally {
             _isLoading.value = false
@@ -124,11 +118,11 @@ class ChavaraRepository(private val context: Context) {
     }
 
     fun getTodaysBirthdayMembers(): List<FamilyMember> {
-        return _familyMembers.value.filter { it.isBirthdayToday() }
+        return _familyMembers.value.filter { member -> member.isBirthdayToday() }
     }
 
     fun getMembersByMonth(): Map<Int, List<FamilyMember>> {
-        return _familyMembers.value.groupBy { it.getBirthMonth() }
+        return _familyMembers.value.groupBy { member -> member.getBirthMonth() }
     }
 
     suspend fun saveFamilyMember(member: FamilyMember): Boolean {
@@ -148,7 +142,7 @@ class ChavaraRepository(private val context: Context) {
             }
             saved
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("ChavaraRepo", "Error saving member: ${e.message}")
             false
         }
     }
@@ -165,7 +159,7 @@ class ChavaraRepository(private val context: Context) {
             }
             deleted
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("ChavaraRepo", "Error deleting member: ${e.message}")
             false
         }
     }
@@ -179,7 +173,7 @@ class ChavaraRepository(private val context: Context) {
             }
             saved
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("ChavaraRepo", "Error saving user profile: ${e.message}")
             false
         }
     }

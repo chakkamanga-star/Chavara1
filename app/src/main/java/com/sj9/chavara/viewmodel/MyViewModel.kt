@@ -15,9 +15,9 @@ class MyViewModel(
     private val repository: ChavaraRepository
 ) : ViewModel() {
 
-    val familyMembers = repository.familyMembers.asStateFlow()
-    val isLoading = repository.isLoading.asStateFlow()
-    val userProfile = repository.userProfile.asStateFlow()
+    val familyMembers = repository.familyMembers
+    val isLoading = repository.isLoading
+    val userProfile = repository.userProfile
 
     // Today's birthday members for home screen
     val todaysBirthdayMembers = repository.familyMembers.map {

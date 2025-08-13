@@ -1,6 +1,5 @@
 package com.sj9.chavara.navigation
 
-import android.app.Application
 import android.content.Context
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
@@ -16,7 +15,6 @@ import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -96,9 +94,8 @@ fun AppNavigation(
         }
 
         composable(AppDestinations.HOME) {
-            val homeViewModel: MyViewModel = viewModel(factory = viewModelFactory)
+            // FIX: HomeScreen does not take a ViewModel. It creates its own repository.
             HomeScreen(
-                viewModel = homeViewModel,
                 onOrientationClick = { navController.navigate(AppDestinations.GALLERY_ROUTE) },
                 onCalendarClick = { navController.navigate(AppDestinations.CALENDAR_ROUTE) },
                 onProfileClick = { navController.navigate(AppDestinations.PROFILE_ROUTE) },
@@ -119,10 +116,9 @@ fun AppNavigation(
 
         navigation(startDestination = "calendar_main", route = AppDestinations.CALENDAR_ROUTE) {
             composable("calendar_main") {
-                val parentEntry = remember(it) { navController.getBackStackEntry(AppDestinations.CALENDAR_ROUTE) }
-                val calendarViewModel: CalendarViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = viewModelFactory)
+                // FIX: CalendarScreen expects a repository, not a ViewModel.
                 CalendarScreen(
-                    viewModel = calendarViewModel,
+                    repository = repository,
                     onDateClick = { navController.navigate("calendar_events") }
                 )
             }
@@ -165,12 +161,10 @@ fun AppNavigation(
                 )
             }
             composable("family_detail/{memberId}") { backStackEntry ->
-                val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(AppDestinations.FAMILY_ROUTE) }
-                val familyViewModel: FamilyMembersViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = viewModelFactory)
                 val memberIdString = backStackEntry.arguments?.getString("memberId") ?: "0"
                 val isNewMember = memberIdString == "new"
+                // FIX: FamilyMemberScreen does not take a ViewModel. It creates its own repository.
                 FamilyMemberScreen(
-                    viewModel = familyViewModel,
                     isNewMember = isNewMember,
                     memberId = if (isNewMember) -1 else memberIdString.toIntOrNull() ?: 0,
                     onEditPhotoClick = { navController.navigate("family_photo_edit/$memberIdString") },
@@ -228,7 +222,9 @@ private fun AuthAnimationController(onOnboardingComplete: () -> Unit) {
     )
 
     Box(
-        modifier = Modifier.fillMaxSize().background(backgroundBrush),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(backgroundBrush),
         contentAlignment = Alignment.Center
     ) {
         AnimatedContent(
