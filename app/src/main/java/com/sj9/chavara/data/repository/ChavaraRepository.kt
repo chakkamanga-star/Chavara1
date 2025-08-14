@@ -85,28 +85,40 @@ class ChavaraRepository(private val context: Context) {
                         val imageData = imageDownloadService.downloadImage(member.photoUrl)
                         if (imageData != null) {
                             val fileName = imageDownloadService.generateImageFileName(member.photoUrl, member.id)
-                            // FIX: Determine content type dynamically, or handle failure better
                             val contentType = imageDownloadService.getMimeType(member.photoUrl)
                             val gcsUrl = googleCloudStorageService.uploadMediaFile(fileName, imageData, contentType)
 
-                            // FIX: Handle upload failure explicitly
                             if (gcsUrl != null) {
                                 member.copy(photoUrl = gcsUrl)
                             } else {
                                 onProgress("Failed to upload photo for ${member.name}")
-                                member // Return original member if upload fails
+                                member
                             }
                         } else {
                             onProgress("Failed to download photo for ${member.name}")
-                            member // Return original member if download fails
+                            member
                         }
                     } else {
                         member
                     }
                 }
 
-                val saved = googleCloudStorageService.saveFamilyMembers(newMembers)
-                if (saved) {
+                // First, save the main list file as before
+                val listSaved = googleCloudStorageService.saveFamilyMembers(newMembers)
+
+                // **THE FIX: Now, loop and save each member individually**
+                var individualSavesSucceeded = true
+                onProgress("Saving individual member records...")
+                for (member in newMembers) {
+                    val success = googleCloudStorageService.saveFamilyMember(member)
+                    if (!success) {
+                        individualSavesSucceeded = false
+                        Log.e("ChavaraRepo", "Failed to save individual record for ${member.name}")
+                        // Decide if you want to stop or continue on failure
+                    }
+                }
+
+                if (listSaved && individualSavesSucceeded) {
                     _familyMembers.value = newMembers
                     sharedPrefs.edit {
                         putString("last_spreadsheet_url", spreadsheetUrl)
@@ -114,7 +126,7 @@ class ChavaraRepository(private val context: Context) {
                     }
                     Result.success("Successfully loaded and saved ${newMembers.size} members")
                 } else {
-                    Result.failure(Exception("Failed to save data to cloud storage"))
+                    Result.failure(Exception("Failed to save all data to cloud storage. List save: $listSaved, Individual saves: $individualSavesSucceeded"))
                 }
             } else {
                 Result.failure(Exception("No data found in the spreadsheet"))
