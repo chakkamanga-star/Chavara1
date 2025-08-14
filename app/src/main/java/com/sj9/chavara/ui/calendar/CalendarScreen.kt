@@ -52,9 +52,7 @@ fun CalendarScreen(
     repository: ChavaraRepository
 ) {
     // Connect the ViewModel
-    val viewModel: CalendarViewModel = remember {
-        CalendarViewModel(repository)
-    }
+
 
     // Observe ViewModel state
     val selectedDate by viewModel.selectedDate.collectAsState()
