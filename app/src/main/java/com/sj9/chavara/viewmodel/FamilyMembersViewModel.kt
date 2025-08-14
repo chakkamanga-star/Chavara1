@@ -34,10 +34,15 @@ open class FamilyMembersViewModel(
 
     fun saveFamilyMember(member: FamilyMember) {
         viewModelScope.launch {
-            repository.saveFamilyMember(member)
+            // If the member is new (ID is 0 or less), get a new ID from the repository
+            if (member.id <= 0) {
+                val newId = repository.getNewFamilyMemberId()
+                repository.saveFamilyMember(member.copy(id = newId))
+            } else {
+                repository.saveFamilyMember(member)
+            }
         }
     }
-
     fun deleteFamilyMember(memberId: Int) {
         viewModelScope.launch {
             repository.deleteFamilyMember(memberId)

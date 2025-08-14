@@ -262,4 +262,8 @@ class ChavaraRepository(private val context: Context) {
         val time = sharedPrefs.getLong("last_sync_time", 0L)
         return Pair(url, time)
     }
-}
+
+    fun getNewFamilyMemberId(): Int {
+        val currentMaxId = _familyMembers.value.maxByOrNull { it.id }?.id ?: 0
+        return currentMaxId + 1
+    }}
