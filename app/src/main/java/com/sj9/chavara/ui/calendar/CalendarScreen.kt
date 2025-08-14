@@ -48,6 +48,7 @@ import java.util.*
 fun CalendarScreen(
     modifier: Modifier = Modifier,
     onDateClick: (Calendar) -> Unit = {},
+    viewModel: CalendarViewModel,
     repository: ChavaraRepository
 ) {
     // Connect the ViewModel
@@ -458,6 +459,8 @@ private fun CalendarDateButton(
 fun CalendarScreenPreview() {
     ChavaraTheme {
         val context = LocalContext.current
-        CalendarScreen(repository = ChavaraRepository(context))
+        val fakeRepository = ChavaraRepository(context)
+        val fakeViewModel = CalendarViewModel(fakeRepository)
+        CalendarScreen(viewModel = fakeViewModel)
     }
 }

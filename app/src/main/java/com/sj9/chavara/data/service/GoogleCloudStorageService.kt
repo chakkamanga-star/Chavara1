@@ -7,7 +7,7 @@ import com.google.cloud.storage.BlobInfo
 import com.google.cloud.storage.Storage
 import com.google.cloud.storage.StorageOptions
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+
 import com.sj9.chavara.data.model.FamilyMember
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -31,20 +31,15 @@ class GoogleCloudStorageService(private val context: Context) {
     private fun getStorage(): Storage? {
         if (!_storageInitialized) {
             try {
-                Log.d(TAG, "Initializing Google Cloud Storage service...")
                 val credentials = ServiceAccountManager.getGcsCredentials(context)
                 if (credentials != null) {
-                    _storage = StorageOptions.newBuilder()
-                        .setCredentials(credentials)
-                        .build()
-                        .service
-                    Log.d(TAG, "Google Cloud Storage service initialized successfully.")
+                    _storage = StorageOptions.newBuilder().setCredentials(credentials).build().service
+                    Log.d(TAG, "GCS service initialized successfully.")
                 } else {
-                    Log.e(TAG, "GCS credentials are null. Service not initialized.")
+                    Log.e(TAG, "GCS credentials are null.")
                 }
             } catch (e: Exception) {
-                // FIX: Log the exception instead of silently failing
-                Log.e(TAG, "Failed to initialize Google Cloud Storage service", e)
+                Log.e(TAG, "Failed to initialize GCS", e)
                 _storage = null
             } finally {
                 _storageInitialized = true
@@ -53,68 +48,57 @@ class GoogleCloudStorageService(private val context: Context) {
         return _storage
     }
 
-    /**
-     * Save family members data to Cloud Storage
-     */
-    suspend fun saveFamilyMembers(familyMembers: List<FamilyMember>): Boolean =
-        withContext(Dispatchers.IO) {
-            try {
-                return@withContext getStorage()?.let { storage ->
-                    val json = gson.toJson(familyMembers)
-                    val blobId = BlobId.of(BUCKET_NAME, "family-members/family_members.json")
-                    val blobInfo = BlobInfo.newBuilder(blobId)
-                        .setContentType("application/json")
-                        .build()
-
-                    storage.create(blobInfo, json.toByteArray())
-                    true
-                } ?: false
-            } catch (e: Exception) {
-                e.printStackTrace()
-                false
-            }
-        }
-
-    /**
-     * Load family members data from Cloud Storage
-     */
-    suspend fun loadFamilyMembers(): List<FamilyMember> = withContext(Dispatchers.IO) {
+    suspend fun saveFamilyMembers(familyMembers: List<FamilyMember>): Boolean = withContext(Dispatchers.IO) {
+        // This function now primarily serves as a backup of the full list.
         try {
-            return@withContext getStorage()?.let { storage ->
+            getStorage()?.let { storage ->
+                val json = gson.toJson(familyMembers)
                 val blobId = BlobId.of(BUCKET_NAME, "family-members/family_members.json")
-                val blob = storage.get(blobId)
-
-                if (blob != null && blob.exists()) {
-                    val content = String(blob.getContent())
-                    val type = object : TypeToken<List<FamilyMember>>() {}.type
-                    gson.fromJson<List<FamilyMember>>(content, type)
-                } else {
-                    emptyList()
-                }
-            } ?: emptyList()
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
-        }
-    }
-
-    /**
-     * Save individual family member data
-     */
-    suspend fun saveFamilyMember(member: FamilyMember): Boolean = withContext(Dispatchers.IO) {
-        try {
-            return@withContext getStorage()?.let { storage ->
-                val json = gson.toJson(member)
-                val blobId = BlobId.of(BUCKET_NAME, "family-members/member_${member.id}.json")
-                val blobInfo = BlobInfo.newBuilder(blobId)
-                    .setContentType("application/json")
-                    .build()
-
+                val blobInfo = BlobInfo.newBuilder(blobId).setContentType("application/json").build()
                 storage.create(blobInfo, json.toByteArray())
                 true
             } ?: false
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Failed to save family members list", e)
+            false
+        }
+    }
+
+    suspend fun loadFamilyMembers(): List<FamilyMember> = withContext(Dispatchers.IO) {
+        // **FIX: Load all individual member files instead of the single list file.**
+        try {
+            getStorage()?.let { storage ->
+                val members = mutableListOf<FamilyMember>()
+                val blobs = storage.list(BUCKET_NAME, Storage.BlobListOption.prefix("family-members/member_")).iterateAll()
+                for (blob in blobs) {
+                    try {
+                        val content = String(blob.getContent())
+                        val member = gson.fromJson(content, FamilyMember::class.java)
+                        members.add(member)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to parse member JSON for blob: ${blob.name}", e)
+                    }
+                }
+                Log.d(TAG, "Loaded ${members.size} individual member files.")
+                return@withContext members
+            } ?: emptyList()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load family members", e)
+            emptyList()
+        }
+    }
+
+    suspend fun saveFamilyMember(member: FamilyMember): Boolean = withContext(Dispatchers.IO) {
+        try {
+            getStorage()?.let { storage ->
+                val json = gson.toJson(member)
+                val blobId = BlobId.of(BUCKET_NAME, "family-members/member_${member.id}.json")
+                val blobInfo = BlobInfo.newBuilder(blobId).setContentType("application/json").build()
+                storage.create(blobInfo, json.toByteArray())
+                true
+            } ?: false
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save individual family member", e)
             false
         }
     }

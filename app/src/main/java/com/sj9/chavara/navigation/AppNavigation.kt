@@ -33,6 +33,7 @@ import com.sj9.chavara.ui.gallery.GalleryPhotosScreen
 import com.sj9.chavara.ui.gallery.GalleryVideosScreen
 import com.sj9.chavara.ui.profile.*
 import com.sj9.chavara.ui.theme.*
+import com.sj9.chavara.viewmodel.CalendarViewModel
 import com.sj9.chavara.viewmodel.*
 
 @Suppress("UNCHECKED_CAST")
@@ -118,9 +119,10 @@ fun AppNavigation(
 
         navigation(startDestination = "calendar_main", route = AppDestinations.CALENDAR_ROUTE) {
             composable("calendar_main") {
-                // FIX: CalendarScreen expects a repository, not a ViewModel.
+                val parentEntry = remember(it) { navController.getBackStackEntry(AppDestinations.CALENDAR_ROUTE) }
+                val calendarViewModel: CalendarViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = viewModelFactory)
                 CalendarScreen(
-                    repository = repository,
+                    viewModel = calendarViewModel,
                     onDateClick = { navController.navigate("calendar_events") }
                 )
             }
@@ -165,8 +167,11 @@ fun AppNavigation(
             composable("family_detail/{memberId}") { backStackEntry ->
                 val memberIdString = backStackEntry.arguments?.getString("memberId") ?: "0"
                 val isNewMember = memberIdString == "new"
-                // FIX: FamilyMemberScreen does not take a ViewModel. It creates its own repository.
+                // **FIX: Pass the ViewModel to the FamilyMemberScreen**
+                val parentEntry = remember(it) { navController.getBackStackEntry(AppDestinations.FAMILY_ROUTE) }
+                val familyViewModel: FamilyMembersViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = viewModelFactory)
                 FamilyMemberScreen(
+                    viewModel = familyViewModel, // Pass the shared ViewModel
                     isNewMember = isNewMember,
                     memberId = if (isNewMember) -1 else memberIdString.toIntOrNull() ?: 0,
                     onEditPhotoClick = { navController.navigate("family_photo_edit/$memberIdString") },

@@ -30,6 +30,7 @@ import com.sj9.chavara.ui.theme.ris
 import com.sj9.chavara.data.model.FamilyMember
 import com.sj9.chavara.data.repository.ChavaraRepository
 import com.sj9.chavara.ui.components.AsyncMemberImage
+import com.sj9.chavara.viewmodel.FamilyMembersViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -39,6 +40,7 @@ import java.util.Locale
 fun FamilyMemberScreen(
     modifier: Modifier = Modifier,
     memberId: Int = 0,
+    viewModel: FamilyMembersViewModel,
     isNewMember: Boolean = false,
     initialPhotoUrl: String = "", // Add this to allow parent to pass initial/updated photo URL
     onEditPhotoClick: () -> Unit = {},
@@ -77,8 +79,8 @@ fun FamilyMemberScreen(
 
     // Load existing member data if not new
     LaunchedEffect(memberId, repository) {
-        if (!isNewMember && memberId > 0 && repository != null) {
-            isLoading = true
+        if (!isNewMember && memberId > 0) {
+            val member = viewModel.getMemberById(memberId)
             try {
                 val member = repository.getMemberById(memberId)
                 member?.let {
