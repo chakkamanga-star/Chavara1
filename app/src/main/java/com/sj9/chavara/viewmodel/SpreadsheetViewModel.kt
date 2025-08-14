@@ -3,6 +3,7 @@ package com.sj9.chavara.viewmodel
 import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sj9.chavara.data.repository.ChavaraRepository
 import com.sj9.chavara.ui.utils.SpreadsheetUiState
@@ -12,10 +13,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class SpreadsheetViewModel(application: Application) : AndroidViewModel(application) {
+class SpreadsheetViewModel(private val chavaraRepository: ChavaraRepository) : ViewModel() {
 
     // You already have an instance of the repository here. Use this one!
-    private val chavaraRepository = ChavaraRepository(application.applicationContext)
+
 
     private val _uiState = MutableStateFlow<SpreadsheetUiState>(SpreadsheetUiState.Idle)
     val uiState: StateFlow<SpreadsheetUiState> = _uiState.asStateFlow()

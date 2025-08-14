@@ -45,6 +45,7 @@ class ViewModelFactory(private val repository: ChavaraRepository) : ViewModelPro
             modelClass.isAssignableFrom(GalleryViewModel::class.java) -> GalleryViewModel(repository) as T
             modelClass.isAssignableFrom(ProfileViewModel::class.java) -> ProfileViewModel(repository) as T
             modelClass.isAssignableFrom(CalendarViewModel::class.java) -> CalendarViewModel(repository) as T
+            modelClass.isAssignableFrom(SpreadsheetViewModel::class.java) -> SpreadsheetViewModel(repository) as T
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }
     }
