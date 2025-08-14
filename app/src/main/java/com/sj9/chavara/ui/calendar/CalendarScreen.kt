@@ -49,7 +49,7 @@ fun CalendarScreen(
     modifier: Modifier = Modifier,
     onDateClick: (Calendar) -> Unit = {},
     viewModel: CalendarViewModel,
-    repository: ChavaraRepository
+
 ) {
     // Connect the ViewModel
 
@@ -453,6 +453,7 @@ private fun CalendarDateButton(
     widthDp = 412,
     heightDp = 917
 )
+@Suppress("ViewModelConstructorInComposable")
 @Composable
 fun CalendarScreenPreview() {
     ChavaraTheme {

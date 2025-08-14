@@ -47,7 +47,72 @@ class GoogleCloudStorageService(private val context: Context) {
         }
         return _storage
     }
+    suspend fun testBucketAccess(): Boolean = withContext(Dispatchers.IO) {
+        try {
+            // Test if bucket allows public access
+            val testUrl = "https://storage.googleapis.com/chakka/test-file.txt"
+            val connection = java.net.URL(testUrl).openConnection() as java.net.HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
 
+            val responseCode = connection.responseCode
+            Log.d("GCS_Test", "Public access test response code: $responseCode")
+
+            // If we get 404, bucket is publicly accessible but file doesn't exist
+            // If we get 403, bucket is not publicly accessible
+            // If we get 200, file exists and is accessible
+
+            when (responseCode) {
+                200, 404 -> {
+                    Log.d("GCS_Test", "Bucket is publicly accessible")
+                    true
+                }
+                403 -> {
+                    Log.e("GCS_Test", "Bucket is NOT publicly accessible - need to enable public access")
+                    false
+                }
+                else -> {
+                    Log.w("GCS_Test", "Unexpected response code: $responseCode")
+                    false
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("GCS_Test", "Error testing bucket access", e)
+            false
+        }
+    }
+
+    // Alternative: Use authenticated URLs instead of public URLs
+    suspend fun getAuthenticatedImageUrl(gcsUrl: String): String? = withContext(Dispatchers.IO) {
+        try {
+            if (!gcsUrl.startsWith("gs://")) return@withContext null
+
+            val urlParts = gcsUrl.removePrefix("gs://").split("/", limit = 2)
+            if (urlParts.size != 2) return@withContext null
+
+            val bucketName = urlParts[0]
+            val objectPath = urlParts[1]
+
+            // Use the authenticated storage service to get a signed URL
+            getStorage()?.let { storage ->
+                val blobId = BlobId.of(bucketName, objectPath)
+                val blob = storage.get(blobId)
+
+                if (blob != null && blob.exists()) {
+                    // Generate a signed URL that's valid for 1 hour
+                    val signedUrl = blob.signUrl(1, java.util.concurrent.TimeUnit.HOURS)
+                    signedUrl.toString()
+                } else {
+                    Log.w("GCS_Service", "Blob does not exist: $gcsUrl")
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("GCS_Service", "Error generating signed URL for: $gcsUrl", e)
+            null
+        }
+    }
     suspend fun saveFamilyMembers(familyMembers: List<FamilyMember>): Boolean = withContext(Dispatchers.IO) {
         // This function now primarily serves as a backup of the full list.
         try {

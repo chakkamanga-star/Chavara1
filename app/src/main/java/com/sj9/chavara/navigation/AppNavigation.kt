@@ -168,7 +168,7 @@ fun AppNavigation(
                 val memberIdString = backStackEntry.arguments?.getString("memberId") ?: "0"
                 val isNewMember = memberIdString == "new"
                 // **FIX: Pass the ViewModel to the FamilyMemberScreen**
-                val parentEntry = remember(it) { navController.getBackStackEntry(AppDestinations.FAMILY_ROUTE) }
+                val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(AppDestinations.FAMILY_ROUTE) }
                 val familyViewModel: FamilyMembersViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = viewModelFactory)
                 FamilyMemberScreen(
                     viewModel = familyViewModel, // Pass the shared ViewModel

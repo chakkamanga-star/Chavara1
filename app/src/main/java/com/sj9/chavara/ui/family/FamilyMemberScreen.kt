@@ -1,16 +1,14 @@
 package com.sj9.chavara.ui.family
 
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import android.util.Log
-import androidx.compose.material3.Text // Keep this if used elsewhere, or remove if not
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -18,7 +16,6 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -26,16 +23,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sj9.chavara.R
-import com.sj9.chavara.ui.theme.ris
 import com.sj9.chavara.data.model.FamilyMember
-import com.sj9.chavara.data.repository.ChavaraRepository
 import com.sj9.chavara.ui.components.AsyncMemberImage
+import com.sj9.chavara.ui.theme.ris
 import com.sj9.chavara.viewmodel.FamilyMembersViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
 
 @Composable
 fun FamilyMemberScreen(
@@ -43,20 +38,10 @@ fun FamilyMemberScreen(
     memberId: Int = 0,
     viewModel: FamilyMembersViewModel,
     isNewMember: Boolean = false,
-    initialPhotoUrl: String = "", // Add this to allow parent to pass initial/updated photo URL
+    initialPhotoUrl: String = "",
     onEditPhotoClick: () -> Unit = {},
-    onSaveComplete: (FamilyMember) -> Unit = {} // Consider passing the saved member back
+    onSaveComplete: (FamilyMember) -> Unit = {}
 ) {
-    val context = LocalContext.current
-    val repository = remember {
-        try {
-            ChavaraRepository(context) // Non-Composable call
-        } catch (e: Exception) {
-            // Log error or show a message to the user via a state variable
-            e.printStackTrace()
-            null // Repository initialization failed
-        }
-    }
     val coroutineScope = rememberCoroutineScope()
 
     // State for form inputs
@@ -67,11 +52,11 @@ fun FamilyMemberScreen(
     var residence by remember { mutableStateOf("") }
     var emailAddress by remember { mutableStateOf("") }
     var chavaraPart by remember { mutableStateOf("") }
-    var photoUrl by remember { mutableStateOf(initialPhotoUrl) } // State for photo URL
+    var photoUrl by remember { mutableStateOf(initialPhotoUrl) }
     var isSaving by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) } // For loading indicator
+    var isLoading by remember { mutableStateOf(false) }
 
-    // Update photoUrl if initialPhotoUrl changes from parent (e.g., after photo edit)
+    // Update photoUrl if initialPhotoUrl changes
     LaunchedEffect(initialPhotoUrl) {
         if (initialPhotoUrl.isNotEmpty()) {
             photoUrl = initialPhotoUrl
@@ -79,36 +64,22 @@ fun FamilyMemberScreen(
     }
 
     // Load existing member data if not new
-    LaunchedEffect(memberId, repository) {
+    LaunchedEffect(memberId) {
         if (!isNewMember && memberId > 0) {
+            isLoading = true
             val member = viewModel.getMemberById(memberId)
-            try {
-                val member = repository.getMemberById(memberId)
-                member?.let {
-                    name = it.name
-                    course = it.course
-                    birthDay = it.birthday
-                    phoneNumber = it.phoneNumber
-                    residence = it.residence
-                    emailAddress = it.emailAddress
-                    chavaraPart = it.chavaraPart
-                    photoUrl = it.photoUrl // Populate photoUrl state
-                    // If initialPhotoUrl was also provided, decide precedence or merge logic
-                    if (initialPhotoUrl.isNotEmpty() && initialPhotoUrl != it.photoUrl) {
-                        // This might happen if parent updates photoUrl while data is also loading
-                        // Decide which one takes precedence or how to handle.
-                        // For now, let's assume loaded data is more current for existing member.
-                        photoUrl = it.photoUrl
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                // Handle error, e.g., show a Snackbar or a message via a state variable
+            member?.let {
+                name = it.name
+                course = it.course
+                birthDay = it.birthday
+                phoneNumber = it.phoneNumber
+                residence = it.residence
+                emailAddress = it.emailAddress
+                chavaraPart = it.chavaraPart
+                photoUrl = it.photoUrl
             }
             isLoading = false
         } else if (isNewMember) {
-            // If it's a new member, ensure fields are clear or set to defaults
-            // (they are already from mutableStateOf(""), but good for explicitness)
             name = ""
             course = ""
             birthDay = ""
@@ -116,21 +87,13 @@ fun FamilyMemberScreen(
             residence = ""
             emailAddress = ""
             chavaraPart = ""
-            photoUrl = initialPhotoUrl // Use initialPhotoUrl if provided for new member
+            photoUrl = initialPhotoUrl
             isLoading = false
         }
     }
 
-    if (repository == null) {
-        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Error: Could not initialize repository. Please try again later.", color = Color.Red)
-        }
-        return // Stop rendering if repository is null
-    }
-
     if (isLoading && !isNewMember) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            // Replace with your actual CircularProgressIndicator or loading UI
             Text("Loading member data...", color = Color.White)
         }
     } else {
@@ -165,11 +128,9 @@ fun FamilyMemberScreen(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                // Show actual member photo if available (or placeholder via AsyncMemberImage)
-                // AsyncMemberImage will handle empty photoUrl by showing initials or its own placeholder
                 AsyncMemberImage(
-                    imageUrl = photoUrl, // Use the photoUrl state
-                    memberName = name.ifEmpty { "Member" }, // Provide a fallback name if name is empty
+                    imageUrl = photoUrl,
+                    memberName = name.ifEmpty { "Member" },
                     size = 150.dp,
                     cornerRadius = 16.dp
                 )
@@ -179,9 +140,9 @@ fun FamilyMemberScreen(
             Box(
                 modifier = Modifier
                     .offset(x = 16.dp, y = 208.dp)
-                    .size(width = 388.dp, height = 833.dp) // Consider if this size needs to be dynamic
+                    .size(width = 388.dp, height = 833.dp)
             ) {
-                // Background card with gradient
+                // Background card
                 Box(
                     modifier = Modifier
                         .offset(x = 13.dp, y = 143.dp)
@@ -198,18 +159,17 @@ fun FamilyMemberScreen(
                         )
                 )
 
-                // Jesus image overlay
+                // Jesus image
                 Image(
                     painter = painterResource(id = R.drawable.jesus),
                     contentDescription = null,
                     modifier = Modifier
                         .offset(x = (-2).dp, y = 133.dp)
                         .size(width = 388.dp, height = 690.dp)
-                        .alpha(1f), // Ensure alpha is between 0f and 1f
+                        .alpha(1f),
                     contentScale = ContentScale.Crop
                 )
 
-                // Profile Photo text
                 Text(
                     text = "Profile Photo",
                     color = Color.White,
@@ -218,58 +178,20 @@ fun FamilyMemberScreen(
                     fontWeight = FontWeight.Normal,
                     modifier = Modifier
                         .offset(x = 58.dp, y = 0.dp)
-                        .size(width = 139.dp, height = 95.dp) // Consider using wrapContentSize
+                        .size(width = 139.dp, height = 95.dp)
                 )
 
-                // Form fields with input capability
+                EditableFormField("Name", name, { name = it }, Modifier.offset(x = 48.dp, y = 183.dp))
+                EditableFormField("Course", course, { course = it }, Modifier.offset(x = 48.dp, y = 230.dp))
+                EditableFormField("Birth Day (DD/MM/YYYY)", birthDay, { birthDay = it }, Modifier.offset(x = 48.dp, y = 277.dp))
+                EditableFormField("Phone Number", phoneNumber, { phoneNumber = it }, Modifier.offset(x = 48.dp, y = 324.dp))
+                EditableFormField("Residence", residence, { residence = it }, Modifier.offset(x = 48.dp, y = 371.dp))
+                EditableFormField("Email Address", emailAddress, { emailAddress = it }, Modifier.offset(x = 48.dp, y = 418.dp))
                 EditableFormField(
-                    label = "Name",
-                    value = name,
-                    onValueChange = { name = it },
-                    modifier = Modifier.offset(x = 48.dp, y = 183.dp)
-                )
-
-                EditableFormField(
-                    label = "Course",
-                    value = course,
-                    onValueChange = { course = it },
-                    modifier = Modifier.offset(x = 48.dp, y = 230.dp)
-                )
-
-                EditableFormField(
-                    label = "Birth Day (DD/MM/YYYY)",
-                    value = birthDay,
-                    onValueChange = { birthDay = it },
-                    modifier = Modifier.offset(x = 48.dp, y = 277.dp)
-                )
-
-                EditableFormField(
-                    label = "Phone Number",
-                    value = phoneNumber,
-                    onValueChange = { phoneNumber = it },
-                    modifier = Modifier.offset(x = 48.dp, y = 324.dp)
-                )
-
-                EditableFormField(
-                    label = "Residence",
-                    value = residence,
-                    onValueChange = { residence = it },
-                    modifier = Modifier.offset(x = 48.dp, y = 371.dp)
-                )
-
-                EditableFormField(
-                    label = "Email Address",
-                    value = emailAddress,
-                    onValueChange = { emailAddress = it },
-                    modifier = Modifier.offset(x = 48.dp, y = 418.dp)
-                )
-
-                // Chavara Part field (larger)
-                EditableFormField(
-                    label = "How do you want to be part of Chavara Youth?",
-                    value = chavaraPart,
-                    onValueChange = { chavaraPart = it },
-                    modifier = Modifier.offset(x = 48.dp, y = 465.dp),
+                    "How do you want to be part of Chavara Youth?",
+                    chavaraPart,
+                    { chavaraPart = it },
+                    Modifier.offset(x = 48.dp, y = 465.dp),
                     isLarge = true
                 )
 
@@ -278,19 +200,16 @@ fun FamilyMemberScreen(
                     modifier = Modifier
                         .offset(x = 148.dp, y = 560.dp)
                         .size(width = 68.dp, height = 41.dp)
-                        .clickable(enabled = !isSaving && repository != null) {
-                            // Basic validation (optional, enhance as needed)
+                        .clickable(enabled = !isSaving) {
                             if (name.isBlank()) {
-                                // Show some error to the user (e.g., Toast, Snackbar, or update a state variable)
-                                println("Name cannot be empty") // Replace with user-facing error
+                                println("Name cannot be empty")
                                 return@clickable
                             }
-
                             coroutineScope.launch {
                                 isSaving = true
                                 try {
                                     val memberToSave = FamilyMember(
-                                        id = if (isNewMember) 0 else memberId, // For new member, ID is typically set by backend/DB
+                                        id = if (isNewMember) 0 else memberId,
                                         name = name,
                                         course = course,
                                         birthday = birthDay,
@@ -298,41 +217,23 @@ fun FamilyMemberScreen(
                                         residence = residence,
                                         emailAddress = emailAddress,
                                         chavaraPart = chavaraPart,
-                                        photoUrl = photoUrl, // Use the current photoUrl state
-                                        videoUrl = "", // Default or from state
-                                        submissionDate = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                                            .format(Date())
+                                        photoUrl = photoUrl,
+                                        videoUrl = "",
+                                        submissionDate = SimpleDateFormat(
+                                            "yyyy-MM-dd HH:mm:ss",
+                                            Locale.getDefault()
+                                        ).format(Date())
                                     )
-
-                                    // 'saveFamilyMember' from your repository returns Boolean
-                                    val wasSaveSuccessful: Boolean = repository!!.saveFamilyMember(memberToSave)
-
-                                    if (wasSaveSuccessful) {
-                                        // If save was successful, call onSaveComplete with the
-                                        // FamilyMember object you attempted to save.
-                                        onSaveComplete(memberToSave)
-                                    } else {
-                                        // Handle the case where saving to the repository failed
-                                        // You might want to show an error message to the user here
-                                        // using a Snackbar or updating another state variable.
-                                        Log.e("FamilyMemberScreen", "Failed to save family member.")
-                                        // Optionally, you could have an onSaveFailed callback or similar.
-                                    }
-
+                                    viewModel.saveFamilyMember(memberToSave)
+                                    onSaveComplete(memberToSave)
                                 } catch (e: Exception) {
-                                    e.printStackTrace()
-                                    // Handle other exceptions (e.g., network issues if not caught in repo)
-                                    Log.e("FamilyMemberScreen", "Exception while saving family member", e)
+                                    Log.e("FamilyMemberScreen", "Error saving member", e)
                                 } finally {
                                     isSaving = false
                                 }
                             }
-// ...
                         }
-                        .background(
-                            Color(0xFF4EDAE9),
-                            shape = RoundedCornerShape(20.dp)
-                        )
+                        .background(Color(0xFF4EDAE9), shape = RoundedCornerShape(20.dp))
                         .alpha(if (isSaving) 0.5f else 0.7f),
                     contentAlignment = Alignment.Center
                 ) {
@@ -346,7 +247,7 @@ fun FamilyMemberScreen(
                 }
             }
 
-            // Edit button for Photo
+            // Edit photo button
             Box(
                 modifier = Modifier
                     .offset(x = 234.dp, y = 263.dp)
@@ -372,14 +273,13 @@ fun FamilyMemberScreen(
                     painter = painterResource(id = R.drawable.ic_edit),
                     contentDescription = "Edit Photo",
                     modifier = Modifier
-                        .align(Alignment.Center) // Center the icon
-                        .size(width = 30.dp, height = 30.dp) // Adjust size as needed
+                        .align(Alignment.Center)
+                        .size(width = 30.dp, height = 30.dp)
                 )
             }
         }
     }
 }
-
 
 @Composable
 private fun EditableFormField(
@@ -390,41 +290,37 @@ private fun EditableFormField(
     isLarge: Boolean = false
 ) {
     val fieldHeight = if (isLarge) 94.dp else 51.dp
-
     Box(
         modifier = modifier
             .width(268.dp)
             .height(fieldHeight)
-            .background(
-                Color(0x3C04747C), // Consider using Color.Transparent and a Border if this is meant to be an outline
-                shape = RoundedCornerShape(20.dp)
-            )
-            .padding(horizontal = 16.dp, vertical = 8.dp), // Adjusted padding
+            .background(Color(0x3C04747C), shape = RoundedCornerShape(20.dp))
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         contentAlignment = if (isLarge) Alignment.TopStart else Alignment.CenterStart
     ) {
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxSize(), // Fill the padded Box
+            modifier = Modifier.fillMaxSize(),
             textStyle = TextStyle(
                 color = Color.White,
                 fontFamily = ris,
-                fontSize = 20.sp, // Slightly reduced for better fit
+                fontSize = 20.sp,
                 fontWeight = FontWeight.Normal
             ),
             decorationBox = { innerTextField ->
-                Box(modifier = Modifier.fillMaxSize()) { // Ensure decoration box fills
+                Box(modifier = Modifier.fillMaxSize()) {
                     if (value.isEmpty()) {
                         Text(
                             text = label,
                             color = Color.White.copy(alpha = 0.7f),
                             fontFamily = ris,
-                            fontSize = 20.sp, // Match text style
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Normal,
                             modifier = Modifier.align(if (isLarge) Alignment.TopStart else Alignment.CenterStart)
                         )
                     }
-                    innerTextField() // This is where the actual text input appears
+                    innerTextField()
                 }
             },
             singleLine = !isLarge,
@@ -436,18 +332,25 @@ private fun EditableFormField(
 @Preview(showBackground = true, name = "New Member")
 @Composable
 fun FamilyMemberScreenNewPreview() {
-    // Wrap in your theme if needed, e.g., ChavaraTheme { ... }
-    FamilyMemberScreen(isNewMember = true, onSaveComplete = {})
+    // Here you'd normally inject a fake ViewModel for preview purposes
+    // Using a placeholder ViewModel with no repository calls
+    val fakeViewModel = object : FamilyMembersViewModel(repository = TODO()) {}
+    FamilyMemberScreen(
+        isNewMember = true,
+        viewModel = fakeViewModel,
+        onSaveComplete = {}
+    )
 }
 
 @Preview(showBackground = true, name = "Existing Member")
 @Composable
 fun FamilyMemberScreenExistingPreview() {
-    // Wrap in your theme if needed
+    val fakeViewModel = object : FamilyMembersViewModel(repository = TODO()) {}
     FamilyMemberScreen(
         memberId = 1,
         isNewMember = false,
-        initialPhotoUrl = "https://via.placeholder.com/150", // Example URL
+        initialPhotoUrl = "https://via.placeholder.com/150",
+        viewModel = fakeViewModel,
         onSaveComplete = {}
     )
 }

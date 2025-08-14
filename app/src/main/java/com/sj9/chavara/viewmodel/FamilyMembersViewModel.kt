@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class FamilyMembersViewModel(
+open class FamilyMembersViewModel(
     private val repository: ChavaraRepository
 ) : ViewModel() {
     init {
