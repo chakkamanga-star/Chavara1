@@ -13,6 +13,11 @@ import kotlinx.coroutines.launch
 class FamilyMembersViewModel(
     private val repository: ChavaraRepository
 ) : ViewModel() {
+    init {
+        viewModelScope.launch {
+            repository.initialize()
+        }
+    }
 
     // FIX: Removed the redundant .asStateFlow() calls
     val familyMembers: StateFlow<List<FamilyMember>> = repository.familyMembers

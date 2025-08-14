@@ -75,6 +75,7 @@ class CalendarViewModel(
 
     fun refreshCalendarData() {
         viewModelScope.launch {
+            repository.initialize()
             _isLoading.value = true
             try {
                 repository.initialize()

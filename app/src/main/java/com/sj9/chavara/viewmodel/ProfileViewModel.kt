@@ -20,6 +20,7 @@ class ProfileViewModel(
 
     fun saveUserProfile(profile: FamilyMember) {
         viewModelScope.launch {
+            repository.initialize()
             _uiState.value = ProfileUiState.Loading
             val success = repository.saveUserProfile(profile)
             _uiState.value = if (success) {

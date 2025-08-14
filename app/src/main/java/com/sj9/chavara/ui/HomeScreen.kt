@@ -1,6 +1,8 @@
+// In: app/src/main/java/com/sj9/chavara/ui/HomeScreen.kt
+
 package com.sj9.chavara.ui
 
-
+import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -30,9 +32,11 @@ import com.sj9.chavara.ui.utils.*
 import com.sj9.chavara.data.repository.ChavaraRepository
 import com.sj9.chavara.ui.theme.ris
 import com.sj9.chavara.ui.components.AsyncMemberImage
+import com.sj9.chavara.viewmodel.MyViewModel
 
 @Composable
 fun HomeScreen(
+    viewModel: MyViewModel, // <-- It now REQUIRES the ViewModel from AppNavigation
     onOrientationClick: () -> Unit = {},
     onCalendarClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
@@ -40,38 +44,14 @@ fun HomeScreen(
     onSpreadsheetClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
+    // FIX: Get the birthday members directly from the shared ViewModel's state
+    val todaysBirthdayMembers by viewModel.todaysBirthdayMembers.collectAsState()
 
-    // Make repository initialization safe with error handling
-    val repository = remember {
-        try {
-            ChavaraRepository(context)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
+    // FIX: Call the initialize function from the ViewModel
+    LaunchedEffect(Unit) {
+        viewModel.initializeRepository()
     }
 
-    // Get today's birthday members safely
-    val todaysBirthdayMembers = remember(repository) {
-        derivedStateOf {
-            try {
-                repository?.getTodaysBirthdayMembers() ?: emptyList()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                emptyList()
-            }
-        }
-    }.value
-
-    // Initialize repository safely
-    LaunchedEffect(repository) {
-        try {
-            repository?.initialize()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
     // Background gradient matching the React design
     val backgroundGradient = Brush.linearGradient(
         colors = listOf(
@@ -369,9 +349,7 @@ private fun LocalIconButton(
     }
 }
 
-
-
-
+@SuppressLint("ViewModelConstructorInComposable")
 @Preview(
     name = "Home Screen - Large Phone",
     showBackground = true,
@@ -382,6 +360,10 @@ private fun LocalIconButton(
 @Composable
 fun HomeScreenLargePreview() {
     ChavaraTheme {
-        HomeScreen()
+        // FIX: Create a fake repository and ViewModel for the preview
+        val context = LocalContext.current
+        val fakeRepository = ChavaraRepository(context)
+        val fakeViewModel = MyViewModel(fakeRepository)
+        HomeScreen(viewModel = fakeViewModel)
     }
 }

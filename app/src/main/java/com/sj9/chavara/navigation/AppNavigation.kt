@@ -95,7 +95,9 @@ fun AppNavigation(
 
         composable(AppDestinations.HOME) {
             // FIX: HomeScreen does not take a ViewModel. It creates its own repository.
+            val myViewModel: MyViewModel = viewModel(factory = viewModelFactory)
             HomeScreen(
+                viewModel = myViewModel, // Pass the ViewModel to the HomeScreen
                 onOrientationClick = { navController.navigate(AppDestinations.GALLERY_ROUTE) },
                 onCalendarClick = { navController.navigate(AppDestinations.CALENDAR_ROUTE) },
                 onProfileClick = { navController.navigate(AppDestinations.PROFILE_ROUTE) },

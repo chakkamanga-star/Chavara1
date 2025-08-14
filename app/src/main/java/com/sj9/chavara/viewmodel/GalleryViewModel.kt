@@ -62,9 +62,9 @@ class GalleryViewModel(
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     init {
-        // Use viewModelScope.launch to start a coroutine
+
         viewModelScope.launch {
-            // This coroutine will collect from the familyMembers flow
+            repository.initialize()
             repository.familyMembers.collect { members ->
                 // Once we receive the list of members, loading is complete.
                 _isLoading.value = false
