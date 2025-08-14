@@ -44,7 +44,7 @@ object ServiceAccountManager {
                 gcsCredentials = loadCredentialsFromResource(
                     context = context,
                     resourceId = R.raw.gcs_key,
-                    scopes = listOf("https://www.googleapis.com/auth/cloud-platform")
+                    scopes = listOf("https://www.googleapis.com/auth/devstorage.read_write")
                 )
             }
             gcsCredentials

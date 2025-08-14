@@ -122,6 +122,22 @@ class ImageDownloadService {
     }
 
     /**
+     * FIX: Added the missing getMimeType function
+     * Determines the MIME type from a URL string.
+     */
+    fun getMimeType(url: String): String {
+        val extension = getFileExtension(url)
+        return when (extension.lowercase()) {
+            "png" -> "image/png"
+            "gif" -> "image/gif"
+            "webp" -> "image/webp"
+            "jpeg", "jpg" -> "image/jpeg"
+            else -> "application/octet-stream" // Default binary stream type
+        }
+    }
+
+
+    /**
      * Validate if URL is likely an image
      */
     fun isValidImageUrl(url: String): Boolean {

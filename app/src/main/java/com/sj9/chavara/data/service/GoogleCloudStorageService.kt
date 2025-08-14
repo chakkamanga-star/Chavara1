@@ -18,7 +18,11 @@ import kotlinx.coroutines.withContext
  */
 class GoogleCloudStorageService(private val context: Context) {
 
-    private val bucketName = "chakka" // Replace with your actual bucket name
+    // FIX: Make bucket name a constant for clarity
+    companion object {
+        private const val BUCKET_NAME = "chakka"
+        private const val TAG = "GcsService"
+    }
     private val gson = Gson()
 
     private var _storage: Storage? = null
@@ -27,17 +31,22 @@ class GoogleCloudStorageService(private val context: Context) {
     private fun getStorage(): Storage? {
         if (!_storageInitialized) {
             try {
+                Log.d(TAG, "Initializing Google Cloud Storage service...")
                 val credentials = ServiceAccountManager.getGcsCredentials(context)
-                _storage = credentials?.let { creds ->
-                    StorageOptions.newBuilder()
-                        .setCredentials(creds)
+                if (credentials != null) {
+                    _storage = StorageOptions.newBuilder()
+                        .setCredentials(credentials)
                         .build()
                         .service
+                    Log.d(TAG, "Google Cloud Storage service initialized successfully.")
+                } else {
+                    Log.e(TAG, "GCS credentials are null. Service not initialized.")
                 }
-                _storageInitialized = true
             } catch (e: Exception) {
-                e.printStackTrace()
+                // FIX: Log the exception instead of silently failing
+                Log.e(TAG, "Failed to initialize Google Cloud Storage service", e)
                 _storage = null
+            } finally {
                 _storageInitialized = true
             }
         }
@@ -52,7 +61,7 @@ class GoogleCloudStorageService(private val context: Context) {
             try {
                 return@withContext getStorage()?.let { storage ->
                     val json = gson.toJson(familyMembers)
-                    val blobId = BlobId.of(bucketName, "family-members/family_members.json")
+                    val blobId = BlobId.of(BUCKET_NAME, "family-members/family_members.json")
                     val blobInfo = BlobInfo.newBuilder(blobId)
                         .setContentType("application/json")
                         .build()
@@ -72,7 +81,7 @@ class GoogleCloudStorageService(private val context: Context) {
     suspend fun loadFamilyMembers(): List<FamilyMember> = withContext(Dispatchers.IO) {
         try {
             return@withContext getStorage()?.let { storage ->
-                val blobId = BlobId.of(bucketName, "family-members/family_members.json")
+                val blobId = BlobId.of(BUCKET_NAME, "family-members/family_members.json")
                 val blob = storage.get(blobId)
 
                 if (blob != null && blob.exists()) {
@@ -96,7 +105,7 @@ class GoogleCloudStorageService(private val context: Context) {
         try {
             return@withContext getStorage()?.let { storage ->
                 val json = gson.toJson(member)
-                val blobId = BlobId.of(bucketName, "family-members/member_${member.id}.json")
+                val blobId = BlobId.of(BUCKET_NAME, "family-members/member_${member.id}.json")
                 val blobInfo = BlobInfo.newBuilder(blobId)
                     .setContentType("application/json")
                     .build()
@@ -116,7 +125,7 @@ class GoogleCloudStorageService(private val context: Context) {
     suspend fun deleteFamilyMember(memberId: Int): Boolean = withContext(Dispatchers.IO) {
         try {
             return@withContext getStorage()?.let { storage ->
-                val blobId = BlobId.of(bucketName, "family-members/member_$memberId.json")
+                val blobId = BlobId.of(BUCKET_NAME, "family-members/member_$memberId.json")
                 storage.delete(blobId)
                 true
             } ?: false
@@ -133,7 +142,7 @@ class GoogleCloudStorageService(private val context: Context) {
         try {
             return@withContext getStorage()?.let { storage ->
                 val json = gson.toJson(userProfile)
-                val blobId = BlobId.of(bucketName, "user-profile/profile.json")
+                val blobId = BlobId.of(BUCKET_NAME, "user-profile/profile.json")
                 val blobInfo = BlobInfo.newBuilder(blobId)
                     .setContentType("application/json")
                     .build()
@@ -153,7 +162,7 @@ class GoogleCloudStorageService(private val context: Context) {
     suspend fun loadUserProfile(): FamilyMember? = withContext(Dispatchers.IO) {
         try {
             return@withContext getStorage()?.let { storage ->
-                val blobId = BlobId.of(bucketName, "user-profile/profile.json")
+                val blobId = BlobId.of(BUCKET_NAME, "user-profile/profile.json")
                 val blob = storage.get(blobId)
 
                 if (blob != null && blob.exists()) {
@@ -170,52 +179,6 @@ class GoogleCloudStorageService(private val context: Context) {
     }
 
     /**
-     * Save app settings/configuration
-     */
-    @Suppress("UNUSED")  // Suppress if not used; remove if truly unused
-    suspend fun saveAppSettings(settings: Map<String, Any>): Boolean = withContext(Dispatchers.IO) {
-        try {
-            return@withContext getStorage()?.let { storage ->
-                val json = gson.toJson(settings)
-                val blobId = BlobId.of(bucketName, "app-settings/settings.json")
-                val blobInfo = BlobInfo.newBuilder(blobId)
-                    .setContentType("application/json")
-                    .build()
-
-                storage.create(blobInfo, json.toByteArray())
-                true
-            } ?: false
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
-    }
-
-    /**
-     * Load app settings/configuration
-     */
-    @Suppress("UNUSED")  // Suppress if not used; remove if truly unused
-    suspend fun loadAppSettings(): Map<String, Any> = withContext(Dispatchers.IO) {
-        try {
-            return@withContext getStorage()?.let { storage ->
-                val blobId = BlobId.of(bucketName, "app-settings/settings.json")
-                val blob = storage.get(blobId)
-
-                if (blob != null && blob.exists()) {
-                    val content = String(blob.getContent())
-                    val type = object : TypeToken<Map<String, Any>>() {}.type
-                    gson.fromJson<Map<String, Any>>(content, type)
-                } else {
-                    emptyMap()
-                }
-            } ?: emptyMap()
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyMap()
-        }
-    }
-
-    /**
      * Upload media file (photo/video) to Cloud Storage
      */
     suspend fun uploadMediaFile(
@@ -225,13 +188,13 @@ class GoogleCloudStorageService(private val context: Context) {
     ): String? = withContext(Dispatchers.IO) {
         try {
             return@withContext getStorage()?.let { storage ->
-                val blobId = BlobId.of(bucketName, "media/$fileName")
+                val blobId = BlobId.of(BUCKET_NAME, "media/$fileName")
                 val blobInfo = BlobInfo.newBuilder(blobId)
                     .setContentType(contentType)
                     .build()
 
                 storage.create(blobInfo, content)
-                "gs://$bucketName/media/$fileName" // Return GCS URL
+                "gs://$BUCKET_NAME/media/$fileName" // Return GCS URL
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -245,7 +208,7 @@ class GoogleCloudStorageService(private val context: Context) {
     suspend fun deleteMediaFile(fileName: String): Boolean = withContext(Dispatchers.IO) {
         try {
             return@withContext getStorage()?.let { storage ->
-                val blobId = BlobId.of(bucketName, "media/$fileName")
+                val blobId = BlobId.of(BUCKET_NAME, "media/$fileName")
                 storage.delete(blobId)
                 true
             } ?: false
@@ -283,7 +246,7 @@ class GoogleCloudStorageService(private val context: Context) {
         withContext(Dispatchers.IO) {
             try {
                 return@withContext getStorage()?.let { storage ->
-                    val blobId = BlobId.of(bucketName, objectPath) // Using the class property
+                    val blobId = BlobId.of(BUCKET_NAME, objectPath) // Using the class property
                     val blob = storage.get(blobId)
 
                     if (blob != null && blob.exists()) {
@@ -291,7 +254,7 @@ class GoogleCloudStorageService(private val context: Context) {
                     } else {
                         Log.w(
                             "GCS_Service",
-                            "File not found or does not exist: gs://$bucketName/$objectPath"
+                            "File not found or does not exist: gs://$BUCKET_NAME/$objectPath"
                         )
                         null
                     }
@@ -299,7 +262,7 @@ class GoogleCloudStorageService(private val context: Context) {
             } catch (e: Exception) {
                 Log.e(
                     "GCS_Service",
-                    "Error downloading file: gs://$bucketName/$objectPath",
+                    "Error downloading file: gs://$BUCKET_NAME/$objectPath",
                     e
                 )
                 null
@@ -313,7 +276,7 @@ class GoogleCloudStorageService(private val context: Context) {
         try {
             return@withContext getStorage()?.let { storage ->
                 // List all objects and delete them
-                val blobs = storage.list(bucketName).iterateAll()
+                val blobs = storage.list(BUCKET_NAME).iterateAll()
 
                 for (blob in blobs) {
                     storage.delete(blob.blobId)
