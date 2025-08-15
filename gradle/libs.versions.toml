@@ -1,6 +1,6 @@
 [versions]
 accompanistNavigationAnimation = "0.34.0"
-agp = "8.10.1"  # Valid stable
+agp = "8.12.0"  # Valid stable
 androidImageCropper = "4.3.3"
 
 
