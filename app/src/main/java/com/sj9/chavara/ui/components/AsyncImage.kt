@@ -28,8 +28,6 @@ import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.sj9.chavara.data.service.GcsImageLoader
 import com.sj9.chavara.ui.theme.ris
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @Composable
 fun AsyncMemberImage(
@@ -60,7 +58,7 @@ fun AsyncMemberImage(
             finalImageUrl = when {
                 imageUrl.startsWith("gs://") -> {
                     Log.d("AsyncMemberImage", "Converting GCS URL for $memberName")
-                    val gcsLoader = GcsImageLoader(context)
+                    val gcsLoader = GcsImageLoader()
                     val publicUrl = gcsLoader.getPublicGcsUrl(imageUrl)
                     Log.d("AsyncMemberImage", "Converted URL for $memberName: $publicUrl")
                     publicUrl

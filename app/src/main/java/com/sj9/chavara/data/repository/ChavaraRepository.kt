@@ -49,6 +49,10 @@ class ChavaraRepository(context: Context) {
                 Log.e("ChavaraRepo", "GoogleCloudStorageService is null, cannot initialize.")
                 return
             }
+            val isBucketAccessible = googleCloudStorageService.testBucketAccess()
+            if (!isBucketAccessible) {
+                Log.e("ChavaraRepo", "Warning: GCS bucket is not publicly accessible. Image loading may fail.")
+            }
             val members = googleCloudStorageService.loadFamilyMembers()
             _familyMembers.value = members
             val profile = googleCloudStorageService.loadUserProfile()

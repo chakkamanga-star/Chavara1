@@ -1,11 +1,9 @@
 package com.sj9.chavara.data.service
 
-import android.content.Context
-
 /**
  * Service for loading images from Google Cloud Storage
  */
-class GcsImageLoader(private val context: Context) {
+class GcsImageLoader() {
 
 
 
@@ -34,7 +32,7 @@ class GcsImageLoader(private val context: Context) {
 
             // Return public HTTP URL
             "https://storage.googleapis.com/$bucketName/$objectPath"
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
