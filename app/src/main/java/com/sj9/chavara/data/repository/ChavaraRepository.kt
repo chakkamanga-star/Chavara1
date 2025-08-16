@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 
-class ChavaraRepository(private val context: Context) {
+class ChavaraRepository(context: Context) {
 
     private val sharedPrefs: SharedPreferences =
         context.getSharedPreferences("chavara_prefs", Context.MODE_PRIVATE)

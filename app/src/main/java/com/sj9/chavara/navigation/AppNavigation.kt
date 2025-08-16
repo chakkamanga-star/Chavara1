@@ -109,7 +109,8 @@ fun AppNavigation(
         }
 
         composable(AppDestinations.SPREADSHEET) {
-            val spreadsheetViewModel: SpreadsheetViewModel = viewModel()
+            // Use the factory to correctly create the ViewModel
+            val spreadsheetViewModel: SpreadsheetViewModel = viewModel(factory = viewModelFactory)
             SpreadsheetScreen(
                 viewModel = spreadsheetViewModel,
                 onProcessComplete = { navController.navigate(AppDestinations.SAVED) }

@@ -27,7 +27,7 @@ object CoilSetup {
                         .maxSizePercent(0.02) // Use 2% of available disk space for disk cache
                         .build()
                 }
-                .respectCacheHeaders(false) // Important for GCS URLs
+               // Important for GCS URLs
                 .build()
         }
         return imageLoader!!
