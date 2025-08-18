@@ -31,15 +31,24 @@ class GoogleCloudStorageService(private val context: Context) {
     private fun getStorage(): Storage? {
         if (!_storageInitialized) {
             try {
+                Log.d(TAG, "Attempting to get GCS credentials...")
                 val credentials = ServiceAccountManager.getGcsCredentials(context)
                 if (credentials != null) {
-                    _storage = StorageOptions.newBuilder().setCredentials(credentials).build().service
+                    Log.d(TAG, "Credentials obtained successfully")
+                    _storage = StorageOptions.newBuilder()
+                        .setCredentials(credentials)
+                        .setProjectId("velvety-network-468011-t2") // Add explicit project ID
+                        .build()
+                        .service
                     Log.d(TAG, "GCS service initialized successfully.")
                 } else {
-                    Log.e(TAG, "GCS credentials are null.")
+                    Log.e(TAG, "GCS credentials are null - check ServiceAccountManager implementation")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to initialize GCS", e)
+                Log.e(TAG, "Exception type: ${e.javaClass.simpleName}")
+                Log.e(TAG, "Exception message: ${e.message}")
+                e.printStackTrace()
                 _storage = null
             } finally {
                 _storageInitialized = true
@@ -47,7 +56,6 @@ class GoogleCloudStorageService(private val context: Context) {
         }
         return _storage
     }
-
     suspend fun testBucketAccess(): Boolean = withContext(Dispatchers.IO) {
         try {
             // Test if bucket allows public access
@@ -125,36 +133,100 @@ class GoogleCloudStorageService(private val context: Context) {
 
     suspend fun loadFamilyMembers(): List<FamilyMember> = withContext(Dispatchers.IO) {
         try {
-            getStorage()?.let { storage ->
-                val members = mutableListOf<FamilyMember>()
-                Log.d(TAG, "Starting to list blobs with prefix: 'family-members/member_'")
-                val blobs = storage.list(BUCKET_NAME, Storage.BlobListOption.prefix("family-members/member_")).iterateAll()
+            val storage = getStorage()
+            if (storage == null) {
+                Log.e(TAG, "Storage is null - cannot proceed with loading family members")
+                return@withContext emptyList()
+            }
 
+            Log.d(TAG, "Storage initialized, starting to list blobs with prefix: 'family-members/member_'")
+            Log.d(TAG, "Using bucket: $BUCKET_NAME")
+
+            // Test bucket existence first
+            // Test bucket existence first
+            try {
+                Log.d(TAG, "Checking if bucket '$BUCKET_NAME' exists...")
+                val bucket = storage.get(BUCKET_NAME)
+                if (bucket == null) {
+                    Log.e(TAG, "Bucket '$BUCKET_NAME' does not exist or is not accessible")
+                    return@withContext emptyList()
+                }
+                Log.d(TAG, "Bucket '$BUCKET_NAME' exists and is accessible")
+                Log.d(TAG, "Bucket location: ${bucket.location}")
+                Log.d(TAG, "Bucket storage class: ${bucket.storageClass}")
+            } catch (e: com.google.cloud.storage.StorageException) {
+                Log.e(TAG, "StorageException checking bucket existence")
+                Log.e(TAG, "Error code: ${e.code}")
+                Log.e(TAG, "Error message: ${e.message}")
+                Log.e(TAG, "Reason: ${e.reason}")
+                Log.e(TAG, "Is retryable: ${e.isRetryable}")
+                Log.e(TAG, "Full exception:", e)
+                return@withContext emptyList()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error checking bucket existence", e)
+                Log.e(TAG, "Exception type: ${e.javaClass.simpleName}")
+                Log.e(TAG, "Exception message: ${e.message}")
+                e.printStackTrace()
+                return@withContext emptyList()
+            }
+
+            // Try to list blobs
+            val members = mutableListOf<FamilyMember>()
+            try {
+                Log.d(TAG, "Attempting to list blobs...")
+                val blobPage = storage.list(BUCKET_NAME, Storage.BlobListOption.prefix("family-members/member_"))
+                Log.d(TAG, "Got blob page, attempting to iterate...")
+
+                val blobs = blobPage.iterateAll()
+                Log.d(TAG, "Successfully got blob iterator")
+
+                var blobCount = 0
                 for (blob in blobs) {
+                    blobCount++
+                    Log.d(TAG, "Processing blob #$blobCount: ${blob.name}")
+
                     if (blob.name.endsWith("/family_members.json")) {
                         Log.d(TAG, "Skipping main list file: ${blob.name}")
                         continue
                     }
-                    Log.d(TAG, "Found blob: ${blob.name}")
-                    var content: String? = null
+
                     try {
-                        content = String(blob.getContent())
+                        val content = String(blob.getContent())
                         val member = gson.fromJson(content, FamilyMember::class.java)
                         members.add(member)
                         Log.d(TAG, "Successfully parsed member: ${member.name} from ${blob.name}")
                     } catch (e: JsonSyntaxException) {
                         Log.e(TAG, "Failed to parse member JSON for blob: ${blob.name}", e)
-                        Log.e(TAG, "Corrupted content was: $content")
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to process blob: ${blob.name}", e)
                     }
                 }
-                Log.d(TAG, "Loaded ${members.size} individual member files.")
-                return@withContext members
-            } ?: emptyList()
+
+                Log.d(TAG, "Finished processing. Total blobs found: $blobCount, Members loaded: ${members.size}")
+
+            } catch (e: com.google.cloud.storage.StorageException) {
+                Log.e(TAG, "GCS StorageException occurred")
+                Log.e(TAG, "Error code: ${e.code}")
+                Log.e(TAG, "Error message: ${e.message}")
+                Log.e(TAG, "Is retryable: ${e.isRetryable}")
+                Log.e(TAG, "Full exception:", e)
+                return@withContext emptyList()
+            } catch (e: Exception) {
+                Log.e(TAG, "Unexpected exception during blob listing", e)
+                Log.e(TAG, "Exception type: ${e.javaClass.simpleName}")
+                Log.e(TAG, "Exception message: ${e.message}")
+                e.printStackTrace()
+                return@withContext emptyList()
+            }
+
+            return@withContext members
+
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load family members with a critical error.", e)
-            emptyList()
+            Log.e(TAG, "Exception type: ${e.javaClass.simpleName}")
+            Log.e(TAG, "Exception message: ${e.message}")
+            e.printStackTrace()
+            return@withContext emptyList()
         }
     }
 
@@ -345,3 +417,5 @@ class GoogleCloudStorageService(private val context: Context) {
         }
     }
 }
+
+
