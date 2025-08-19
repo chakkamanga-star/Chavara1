@@ -7,6 +7,7 @@ import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
+import android.util.Log // Added Log import for debugging
 
 /**
  * Service for downloading images from URLs (including Google Drive links)
@@ -14,11 +15,20 @@ import java.util.UUID
 class ImageDownloadService {
 
     /**
-     * Download image from URL and return byte array
+     * Data class to hold downloaded image data and its MIME type.
      */
-    suspend fun downloadImage(imageUrl: String): ByteArray? = withContext(Dispatchers.IO) {
+    data class DownloadedImage(
+        val data: ByteArray,
+        val mimeType: String
+    )
+
+    /**
+     * Download image from URL and return its data and MIME type.
+     */
+    suspend fun downloadImage(imageUrl: String): DownloadedImage? = withContext(Dispatchers.IO) {
+        val processedUrl = processImageUrl(imageUrl)
         try {
-            val processedUrl = processImageUrl(imageUrl)
+            Log.d("ImageDownloadService", "Attempting to download from processed URL: $processedUrl")
             val url = URL(processedUrl)
             val connection = url.openConnection() as HttpURLConnection
 
@@ -31,10 +41,12 @@ class ImageDownloadService {
 
             val responseCode = connection.responseCode
             if (responseCode == HttpURLConnection.HTTP_OK) {
+                val contentType = connection.contentType ?: "application/octet-stream"
+                Log.d("ImageDownloadService", "Download successful. Content type from header: $contentType")
+
                 val inputStream = connection.inputStream
                 val buffer = ByteArray(1024)
                 val byteArrayOutputStream = ByteArrayOutputStream()
-
                 var bytesRead: Int
                 while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                     byteArrayOutputStream.write(buffer, 0, bytesRead)
@@ -43,14 +55,18 @@ class ImageDownloadService {
                 inputStream.close()
                 connection.disconnect()
 
-                byteArrayOutputStream.toByteArray()
+                val originalData = byteArrayOutputStream.toByteArray()
+                Log.d("ImageDownloadService", "File downloaded successfully. Size: ${originalData.size} bytes.")
+
+                return@withContext DownloadedImage(originalData, contentType)
             } else {
+                Log.e("ImageDownloadService", "HTTP error response code: $responseCode")
                 connection.disconnect()
-                null
+                return@withContext null
             }
         } catch (e: Exception) {
-            e.printStackTrace()
-            null
+            Log.e("ImageDownloadService", "Error during image download from URL: $processedUrl", e)
+            return@withContext null
         }
     }
 
@@ -59,19 +75,14 @@ class ImageDownloadService {
      */
     private fun processImageUrl(imageUrl: String): String {
         return when {
-            // Google Drive sharing link format: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
             imageUrl.contains("drive.google.com/file/d/") -> {
                 val fileId = extractGoogleDriveFileId(imageUrl)
                 "https://drive.google.com/uc?export=download&id=$fileId"
             }
-
-            // Google Drive direct link format: https://drive.google.com/open?id=FILE_ID
             imageUrl.contains("drive.google.com/open?id=") -> {
                 val fileId = imageUrl.substringAfter("id=").substringBefore("&")
                 "https://drive.google.com/uc?export=download&id=$fileId"
             }
-
-            // Already a direct download link or other image URL
             else -> imageUrl
         }
     }
@@ -96,59 +107,26 @@ class ImageDownloadService {
     }
 
     /**
-     * Generate a unique filename for the downloaded image
+     * Generate a unique filename for the downloaded image based on its mime type.
      */
-    fun generateImageFileName(originalUrl: String, memberId: Int): String {
-        val fileExtension = getFileExtension(originalUrl)
+    fun generateImageFileName(memberId: Int, mimeType: String): String {
+        val extension = when {
+            mimeType.contains("jpeg") -> "jpeg"
+            mimeType.contains("png") -> "png"
+            mimeType.contains("gif") -> "gif"
+            mimeType.contains("webp") -> "webp"
+            mimeType.contains("heic") -> "heic"
+            mimeType.contains("heif") -> "heif"
+            else -> "jpg" // Fallback to jpg
+        }
         val uniqueId = UUID.randomUUID().toString().take(8)
-        return "member_${memberId}_${uniqueId}.$fileExtension"
+        return "member_${memberId}_${uniqueId}.$extension"
     }
 
     /**
-     * Get file extension from URL or default to jpg
-     */
-    private fun getFileExtension(url: String): String {
-        return try {
-            when {
-                url.contains(".png", ignoreCase = true) -> "png"
-                url.contains(".gif", ignoreCase = true) -> "gif"
-                url.contains(".webp", ignoreCase = true) -> "webp"
-                url.contains(".jpeg", ignoreCase = true) -> "jpeg"
-                else -> "jpg"
-            }
-        } catch (_: Exception) {
-            "jpg"
-        }
-    }
-
-    /**
-     * FIX: Added the missing getMimeType function
-     * Determines the MIME type from a URL string.
-     */
-    fun getMimeType(url: String): String {
-        val extension = getFileExtension(url)
-        return when (extension.lowercase()) {
-            "png" -> "image/png"
-            "gif" -> "image/gif"
-            "webp" -> "image/webp"
-            "jpeg", "jpg" -> "image/jpeg"
-            else -> "application/octet-stream" // Default binary stream type
-        }
-    }
-
-
-    /**
-     * Validate if URL is likely an image
+     * Validate if URL is likely an image.
      */
     fun isValidImageUrl(url: String): Boolean {
-        return url.isNotEmpty() && (
-                url.contains("drive.google.com") ||
-                        url.contains(".jpg", ignoreCase = true) ||
-                        url.contains(".jpeg", ignoreCase = true) ||
-                        url.contains(".png", ignoreCase = true) ||
-                        url.contains(".gif", ignoreCase = true) ||
-                        url.contains(".webp", ignoreCase = true) ||
-                        url.contains("image", ignoreCase = true)
-                )
+        return !url.isNullOrEmpty() && url.contains("drive.google.com")
     }
 }

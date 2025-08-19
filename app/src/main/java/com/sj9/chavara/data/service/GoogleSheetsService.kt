@@ -32,17 +32,18 @@ class GoogleSheetsService(private val context: Context) {
 
     companion object {
         private const val TAG = "GoogleSheetsService"
-        // Define constants for the expected column names from your Google Form responses
+        // FIX: Define constants with the exact header names from your Google Form responses
         private const val SUBMISSION_DATE_COLUMN = "Timestamp"
+        private const val EMAIL_ADDRESS_COLUMN = "Email Address"
         private const val NAME_COLUMN = "Name"
         private const val COURSE_COLUMN = "Course"
+        private const val RESIDENCE_COLUMN = "Residence in Bangalore"
+        private const val PHONE_NUMBER_COLUMN = "Phone number"
         private const val BIRTHDAY_COLUMN = "Birthday"
-        private const val PHONE_NUMBER_COLUMN = "Phone Number"
-        private const val RESIDENCE_COLUMN = "Residence"
-        private const val EMAIL_ADDRESS_COLUMN = "Email Address"
-        private const val CHAVARA_PART_COLUMN = "How do you want to be part of Chavara Youth?"
-        private const val PHOTO_URL_COLUMN = "Photo URL (Google Drive link)"
-        private const val VIDEO_URL_COLUMN = "Video URL (optional)"
+        private const val PARISH_NAME_COLUMN = "Name of Parish"
+        // FIX: Corrected the typo in the header name to match the screenshot
+        private const val PHOTO_URL_COLUMN = "Your Image (please upload photos that can be used for posters)"
+        private const val CHAVARA_PART_COLUMN = "How do you want to be part of Chavara youth ministry "
     }
 
     private var _sheetsService: Sheets? = null
@@ -247,15 +248,16 @@ class GoogleSheetsService(private val context: Context) {
 
                 // Use the header map to get the correct column index for each field
                 val submissionDate = getValueAt(row, headerMap[SUBMISSION_DATE_COLUMN])
+                val emailAddress = getValueAt(row, headerMap[EMAIL_ADDRESS_COLUMN])
                 val name = getValueAt(row, headerMap[NAME_COLUMN])
                 val course = getValueAt(row, headerMap[COURSE_COLUMN])
-                val birthday = getValueAt(row, headerMap[BIRTHDAY_COLUMN])
-                val phoneNumber = getValueAt(row, headerMap[PHONE_NUMBER_COLUMN])
                 val residence = getValueAt(row, headerMap[RESIDENCE_COLUMN])
-                val emailAddress = getValueAt(row, headerMap[EMAIL_ADDRESS_COLUMN])
+                val phoneNumber = getValueAt(row, headerMap[PHONE_NUMBER_COLUMN])
+                val birthday = getValueAt(row, headerMap[BIRTHDAY_COLUMN])
                 val chavaraPart = getValueAt(row, headerMap[CHAVARA_PART_COLUMN])
                 val originalPhotoUrl = getValueAt(row, headerMap[PHOTO_URL_COLUMN])
-                val originalVideoUrl = getValueAt(row, headerMap[VIDEO_URL_COLUMN])
+                val originalVideoUrl = ""
+
 
                 if (name.isEmpty()) {
                     Log.w(TAG, "Skipping row at sheet row ${i + 1}: Name is empty.")
@@ -264,6 +266,9 @@ class GoogleSheetsService(private val context: Context) {
                 }
 
                 onProgress("Reading $name... (Row ${i + 1}/${values.size})")
+                // FIX: Add a debug log to show the retrieved photo URL
+                Log.d(TAG, "Debug: Found photo URL for $name: '$originalPhotoUrl'")
+
 
                 val sheetRow = SheetRowData(
                     rowIndex = i,
