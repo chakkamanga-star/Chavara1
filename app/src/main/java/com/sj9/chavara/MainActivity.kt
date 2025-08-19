@@ -12,7 +12,7 @@ import com.sj9.chavara.ui.theme.ChavaraTheme
 import androidx.core.view.WindowCompat
 
 import coil.compose.LocalImageLoader
-import com.sj9.chavara.data.service.CoilSetup
+import com.sj9.chavara.data.service.ImageLoaderModule
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -20,11 +20,11 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         enableEdgeToEdge()
         setContent {
-            // Get the shared ImageLoader instance
-            val sharedImageLoader = CoilSetup.getSharedImageLoader(applicationContext)
+            // Get the shared ImageLoader instance from the new, optimized module
+            val sharedImageLoader = ImageLoaderModule.getSharedImageLoader(applicationContext)
 
             ChavaraTheme {
-                // Provide the shared loader to all Composables inside
+                // Provide the shared loader to all Composables inside the app
                 CompositionLocalProvider(LocalImageLoader provides sharedImageLoader) {
                     AppNavigation(modifier = Modifier.fillMaxSize())
                 }

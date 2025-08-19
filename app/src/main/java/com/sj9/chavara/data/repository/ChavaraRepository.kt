@@ -4,7 +4,14 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import androidx.core.content.edit
+import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.sj9.chavara.data.model.FamilyMember
+import com.sj9.chavara.data.service.DataSyncWorker
 import com.sj9.chavara.data.service.GoogleCloudStorageService
 import com.sj9.chavara.data.service.GoogleSheetsService
 import com.sj9.chavara.data.service.ImageDownloadService
@@ -13,7 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-class ChavaraRepository(context: Context) {
+class ChavaraRepository(private val context: Context) {
     private val sharedPrefs: SharedPreferences =
         context.getSharedPreferences("chavara_prefs", Context.MODE_PRIVATE)
     private val imageDownloadService = ImageDownloadService()
@@ -59,10 +66,35 @@ class ChavaraRepository(context: Context) {
         }
     }
 
+    /**
+     * Enqueues a background worker to fetch data from the spreadsheet.
+     * This operation will continue even if the app is backgrounded.
+     */
+    fun triggerDataSyncFromSpreadsheet(spreadsheetUrl: String) {
+        Log.d("ChavaraRepo", "Triggering background data sync.")
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val dataSyncRequest = OneTimeWorkRequestBuilder<DataSyncWorker>()
+            .setInputData(workDataOf(DataSyncWorker.KEY_SPREADSHEET_URL to spreadsheetUrl))
+            .setConstraints(constraints)
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            DataSyncWorker.WORK_NAME,
+            ExistingWorkPolicy.REPLACE,
+            dataSyncRequest
+        )
+    }
+
+
+    // This function is now intended to be called from the background worker
     suspend fun fetchDataFromSpreadsheet(
         spreadsheetUrl: String,
         onProgress: (String) -> Unit = {}
     ): Result<String> {
+        // This function remains largely the same but will be executed by the Worker
         _isLoading.value = true
         return try {
             if (googleSheetsService == null || googleCloudStorageService == null) {
