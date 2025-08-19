@@ -80,20 +80,16 @@ class ChavaraRepository(context: Context) {
             if (newMembers.isNotEmpty()) {
                 onProgress("Downloading and saving member photos...")
                 newMembers = newMembers.map { member ->
-                    Log.d("ChavaraRepo", "Checking image URL for ${member.name}: '${member.photoUrl}'")
                     if (imageDownloadService.isValidImageUrl(member.photoUrl)) {
                         Log.d("ChavaraRepo", "Attempting to download image for ${member.name} from URL: ${member.photoUrl}")
                         try {
                             val imageData = imageDownloadService.downloadImage(member.photoUrl)
                             if (imageData != null) {
-                                // Log the MIME type and size to confirm what was downloaded
-                                Log.d("ChavaraRepo", "Download successful for ${member.name}. File size: ${imageData.data.size} bytes. MIME Type: ${imageData.mimeType}")
-
-                                // Pass the MIME type to the filename generator to preserve the extension
-                                val fileName = imageDownloadService.generateImageFileName(member.id, imageData.mimeType)
+                                Log.d("ChavaraRepo", "Download successful for ${member.name}. File size: ${imageData.size} bytes.")
+                                val fileName = imageDownloadService.generateImageFileName(member.photoUrl, member.id)
+                                val contentType = imageDownloadService.getMimeType(member.photoUrl)
                                 Log.d("ChavaraRepo", "Uploading image for ${member.name} to GCS as '$fileName'")
-                                // Pass the correct MIME type to the upload service
-                                val gcsUrl = googleCloudStorageService.uploadMediaFile(fileName, imageData.data, imageData.mimeType)
+                                val gcsUrl = googleCloudStorageService.uploadMediaFile(fileName, imageData, contentType)
 
                                 if (gcsUrl != null) {
                                     Log.d("ChavaraRepo", "Upload successful. GCS URL: $gcsUrl")
@@ -118,6 +114,9 @@ class ChavaraRepository(context: Context) {
                         member
                     }
                 }
+
+                // Video downloading is not a core part of this feature, so it is made optional.
+                // You can add similar logic here if you want to support it later.
 
                 val saveListResult = newMembers.map { member ->
                     googleCloudStorageService.saveFamilyMember(member)

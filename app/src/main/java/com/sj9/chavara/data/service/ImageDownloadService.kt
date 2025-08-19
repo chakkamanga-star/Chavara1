@@ -1,132 +1,266 @@
-package com.sj9.chavara.data.service
+package com.sj9.chavara.data.repository
 
+import android.content.Context
+import android.content.SharedPreferences
+import android.util.Log
+import androidx.core.content.edit
+import com.sj9.chavara.data.model.FamilyMember
+import com.sj9.chavara.data.service.GoogleCloudStorageService
+import com.sj9.chavara.data.service.GoogleSheetsService
+import com.sj9.chavara.data.service.ImageDownloadService
+import com.sj9.chavara.data.service.SheetRowData
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import com.sj9.chavara.data.service.GcsImageLoader
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
-import java.util.UUID
-import android.util.Log // Added Log import for debugging
+annotation class ImageDownloadService
 
-/**
- * Service for downloading images from URLs (including Google Drive links)
- */
-class ImageDownloadService {
+class ChavaraRepository(context: Context) {
+    private val sharedPrefs: SharedPreferences =
+        context.getSharedPreferences("chavara_prefs", Context.MODE_PRIVATE)
+    private val imageDownloadService = ImageDownloadService()
 
-    /**
-     * Data class to hold downloaded image data and its MIME type.
-     */
-    data class DownloadedImage(
-        val data: ByteArray,
-        val mimeType: String
-    )
+    private val googleSheetsService = try {
+        GoogleSheetsService(context)
+    } catch (e: Exception) {
+        Log.e("ChavaraRepo", "Failed to initialize GoogleSheetsService", e)
+        null
+    }
 
-    /**
-     * Download image from URL and return its data and MIME type.
-     */
-    suspend fun downloadImage(imageUrl: String): DownloadedImage? = withContext(Dispatchers.IO) {
-        val processedUrl = processImageUrl(imageUrl)
+    private val googleCloudStorageService = try {
+        GoogleCloudStorageService(context)
+    } catch (e: Exception) {
+        Log.e("ChavaraRepo", "Failed to initialize GoogleCloudStorageService", e)
+        null
+    }
+
+    private val _familyMembers = MutableStateFlow<List<FamilyMember>>(emptyList())
+    val familyMembers: StateFlow<List<FamilyMember>> = _familyMembers.asStateFlow()
+
+    private val _userProfile = MutableStateFlow<FamilyMember?>(null)
+    val userProfile: StateFlow<FamilyMember?> = _userProfile.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    suspend fun initialize() {
+        _isLoading.value = true
         try {
-            Log.d("ImageDownloadService", "Attempting to download from processed URL: $processedUrl")
-            val url = URL(processedUrl)
-            val connection = url.openConnection() as HttpURLConnection
+            if (googleCloudStorageService == null) {
+                Log.e("ChavaraRepo", "GoogleCloudStorageService is null, cannot initialize.")
+                return
+            }
+            val members = googleCloudStorageService.loadFamilyMembers()
+            _familyMembers.value = members
+            val profile = googleCloudStorageService.loadUserProfile()
+            _userProfile.value = profile
+        } catch (e: Exception) {
+            Log.e("ChavaraRepo", "Error during initialization", e)
+        } finally {
+            _isLoading.value = false
+        }
+    }
 
-            connection.apply {
-                requestMethod = "GET"
-                connectTimeout = 10000
-                readTimeout = 15000
-                setRequestProperty("User-Agent", "Chavara Youth App")
+    suspend fun fetchDataFromSpreadsheet(
+        spreadsheetUrl: String,
+        onProgress: (String) -> Unit = {}
+    ): Result<String> {
+        _isLoading.value = true
+        return try {
+            if (googleSheetsService == null || googleCloudStorageService == null) {
+                return Result.failure(Exception("Google services not available."))
             }
 
-            val responseCode = connection.responseCode
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                val contentType = connection.contentType ?: "application/octet-stream"
-                Log.d("ImageDownloadService", "Download successful. Content type from header: $contentType")
+            if (!googleSheetsService.validateSpreadsheetUrl(spreadsheetUrl)) {
+                return Result.failure(Exception("Invalid or inaccessible spreadsheet URL"))
+            }
 
-                val inputStream = connection.inputStream
-                val buffer = ByteArray(1024)
-                val byteArrayOutputStream = ByteArrayOutputStream()
-                var bytesRead: Int
-                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                    byteArrayOutputStream.write(buffer, 0, bytesRead)
+            val rawSheetData = googleSheetsService.fetchRawSheetData(spreadsheetUrl, onProgress)
+            var newMembers = transformSheetDataToFamilyMembers(rawSheetData)
+
+            if (newMembers.isNotEmpty()) {
+                onProgress("Downloading and saving member photos...")
+                newMembers = newMembers.map { member ->
+                    Log.d("ChavaraRepo", "Checking image URL for ${member.name}: '${member.photoUrl}'")
+                    if (imageDownloadService.isValidImageUrl(member.photoUrl)) {
+                        Log.d("ChavaraRepo", "Attempting to download image for ${member.name} from URL: ${member.photoUrl}")
+                        try {
+                            val imageData = imageDownloadService.downloadImage(member.photoUrl)
+                            if (imageData != null) {
+                                // Log the MIME type and size to confirm what was downloaded
+                                Log.d("ChavaraRepo", "Download successful for ${member.name}. File size: ${imageData.data.size} bytes. MIME Type: ${imageData.mimeType}")
+
+                                // Pass the MIME type to the filename generator to preserve the extension
+                                val fileName = imageDownloadService.generateImageFileName(member.id, imageData.mimeType)
+                                Log.d("ChavaraRepo", "Uploading image for ${member.name} to GCS as '$fileName'")
+                                // Pass the correct MIME type to the upload service
+                                val gcsUrl = googleCloudStorageService.uploadMediaFile(fileName, imageData.data, imageData.mimeType)
+
+                                if (gcsUrl != null) {
+                                    Log.d("ChavaraRepo", "Upload successful. GCS URL: $gcsUrl")
+                                    member.copy(photoUrl = gcsUrl)
+                                } else {
+                                    Log.e("ChavaraRepo", "Failed to upload photo for ${member.name} to GCS.")
+                                    onProgress("Failed to upload photo for ${member.name} to GCS.")
+                                    member
+                                }
+                            } else {
+                                Log.e("ChavaraRepo", "Failed to download image for ${member.name}. The download service returned null.")
+                                onProgress("Failed to download photo for ${member.name}. URL may be invalid.")
+                                member
+                            }
+                        } catch (e: Exception) {
+                            onProgress("Error processing photo for ${member.name}")
+                            Log.e("ChavaraRepo", "Error during image download/upload for ${member.name}: ${e.message}", e)
+                            member
+                        }
+                    } else {
+                        Log.d("ChavaraRepo", "Skipping image download for ${member.name} as URL is not valid.")
+                        member
+                    }
                 }
 
-                inputStream.close()
-                connection.disconnect()
+                val saveListResult = newMembers.map { member ->
+                    googleCloudStorageService.saveFamilyMember(member)
+                }
 
-                val originalData = byteArrayOutputStream.toByteArray()
-                Log.d("ImageDownloadService", "File downloaded successfully. Size: ${originalData.size} bytes.")
-
-                return@withContext DownloadedImage(originalData, contentType)
+                if (saveListResult.all { it }) {
+                    _familyMembers.value = newMembers
+                    sharedPrefs.edit {
+                        putString("last_spreadsheet_url", spreadsheetUrl)
+                        putLong("last_sync_time", System.currentTimeMillis())
+                    }
+                    Result.success("Successfully loaded and saved ${newMembers.size} members")
+                } else {
+                    Result.failure(Exception("Failed to save all members to cloud storage."))
+                }
             } else {
-                Log.e("ImageDownloadService", "HTTP error response code: $responseCode")
-                connection.disconnect()
-                return@withContext null
+                Result.failure(Exception("No data found in the spreadsheet"))
             }
         } catch (e: Exception) {
-            Log.e("ImageDownloadService", "Error during image download from URL: $processedUrl", e)
-            return@withContext null
+            Log.e("ChavaraRepo", "Error during spreadsheet fetch: ${e.message}", e)
+            Result.failure(e)
+        } finally {
+            _isLoading.value = false
         }
     }
 
-    /**
-     * Process different types of image URLs (especially Google Drive links)
-     */
-    private fun processImageUrl(imageUrl: String): String {
-        return when {
-            imageUrl.contains("drive.google.com/file/d/") -> {
-                val fileId = extractGoogleDriveFileId(imageUrl)
-                "https://drive.google.com/uc?export=download&id=$fileId"
-            }
-            imageUrl.contains("drive.google.com/open?id=") -> {
-                val fileId = imageUrl.substringAfter("id=").substringBefore("&")
-                "https://drive.google.com/uc?export=download&id=$fileId"
-            }
-            else -> imageUrl
-        }
+    fun getTodaysBirthdayMembers(): List<FamilyMember> {
+        return _familyMembers.value.filter { member -> member.isBirthdayToday() }
     }
 
-    /**
-     * Extract file ID from Google Drive URL
-     */
-    private fun extractGoogleDriveFileId(url: String): String {
+    fun getMembersByMonth(): Map<Int, List<FamilyMember>> {
+        return _familyMembers.value.groupBy { member -> member.getBirthMonth() }
+    }
+
+    suspend fun saveFamilyMember(member: FamilyMember): Boolean {
+        _isLoading.value = true
         return try {
-            when {
-                url.contains("/file/d/") -> {
-                    url.substringAfter("/file/d/").substringBefore("/")
+            val googleCloudStorageService = this.googleCloudStorageService ?: return false
+            val savedIndividual = googleCloudStorageService.saveFamilyMember(member)
+            if (savedIndividual) {
+                val currentMembers = _familyMembers.value.toMutableList()
+                val existingIndex = currentMembers.indexOfFirst { it.id == member.id }
+                if (existingIndex >= 0) {
+                    currentMembers[existingIndex] = member
+                } else {
+                    currentMembers.add(member)
                 }
-                url.contains("id=") -> {
-                    url.substringAfter("id=").substringBefore("&")
-                }
-                else -> ""
+                _familyMembers.value = currentMembers
+                true
+            } else {
+                Log.e("ChavaraRepo", "Failed to save individual member file.")
+                false
             }
-        } catch (_: Exception) {
-            ""
+        } catch (e: Exception) {
+            Log.e("ChavaraRepo", "Error saving member: ${e.message}", e)
+            false
+        } finally {
+            _isLoading.value = false
         }
     }
 
-    /**
-     * Generate a unique filename for the downloaded image based on its mime type.
-     */
-    fun generateImageFileName(memberId: Int, mimeType: String): String {
-        val extension = when {
-            mimeType.contains("jpeg") -> "jpeg"
-            mimeType.contains("png") -> "png"
-            mimeType.contains("gif") -> "gif"
-            mimeType.contains("webp") -> "webp"
-            mimeType.contains("heic") -> "heic"
-            mimeType.contains("heif") -> "heif"
-            else -> "jpg" // Fallback to jpg
+    suspend fun deleteFamilyMember(memberId: Int): Boolean {
+        return try {
+            val googleCloudStorageService = this.googleCloudStorageService ?: return false
+            val deleted = googleCloudStorageService.deleteFamilyMember(memberId)
+            if (deleted) {
+                val currentMembers = _familyMembers.value.toMutableList()
+                currentMembers.removeAll { it.id == memberId }
+                _familyMembers.value = currentMembers
+            }
+            deleted
+        } catch (e: Exception) {
+            Log.e("ChavaraRepo", "Error deleting member: ${e.message}", e)
+            false
         }
-        val uniqueId = UUID.randomUUID().toString().take(8)
-        return "member_${memberId}_${uniqueId}.$extension"
     }
 
-    /**
-     * Validate if URL is likely an image.
-     */
-    fun isValidImageUrl(url: String): Boolean {
-        return !url.isNullOrEmpty() && url.contains("drive.google.com")
+    suspend fun saveUserProfile(profile: FamilyMember): Boolean {
+        return try {
+            val googleCloudStorageService = this.googleCloudStorageService ?: return false
+            val saved = googleCloudStorageService.saveUserProfile(profile.copy(isCurrentUserProfile = true))
+            if (saved) {
+                _userProfile.value = profile
+            }
+            saved
+        } catch (e: Exception) {
+            Log.e("ChavaraRepo", "Error saving user profile: ${e.message}", e)
+            false
+        }
     }
-}
+
+    suspend fun resetAppData(): Boolean {
+        return try {
+            val cloudReset = googleCloudStorageService?.resetAllData() ?: true
+            if (cloudReset) {
+                _familyMembers.value = emptyList()
+                _userProfile.value = null
+                sharedPrefs.edit { clear() }
+                Log.d("ChavaraRepo", "Local data reset successfully.")
+            } else {
+                Log.w("ChavaraRepo", "Cloud data reset failed. Local data NOT reset to prevent inconsistency.")
+            }
+            cloudReset
+        } catch (e: Exception) {
+            Log.e("ChavaraRepo", "Exception during resetAppData", e)
+            false
+        }
+    }
+
+    fun getMemberById(id: Int): FamilyMember? {
+        return _familyMembers.value.find { it.id == id }
+    }
+
+    private fun transformSheetDataToFamilyMembers(rawSheetData: List<SheetRowData>): List<FamilyMember> {
+        return rawSheetData.mapIndexed { index, sheetRow ->
+            FamilyMember(
+                id = index + 1,
+                name = sheetRow.name,
+                course = sheetRow.course,
+                birthday = sheetRow.birthday,
+                phoneNumber = sheetRow.phoneNumber,
+                residence = sheetRow.residence,
+                emailAddress = sheetRow.emailAddress,
+                chavaraPart = sheetRow.chavaraPart,
+                photoUrl = sheetRow.originalPhotoUrl,
+                videoUrl = sheetRow.originalVideoUrl,
+                submissionDate = sheetRow.submissionDate,
+                isCurrentUserProfile = false
+            )
+        }
+    }
+
+    fun getLastSyncInfo(): Pair<String?, Long> {
+        val url = sharedPrefs.getString("last_spreadsheet_url", null)
+        val time = sharedPrefs.getLong("last_sync_time", 0L)
+        return Pair(url, time)
+    }
+
+    fun getNewFamilyMemberId(): Int {
+        val currentMaxId = _familyMembers.value.maxByOrNull { it.id }?.id ?: 0
+        return currentMaxId + 1
+    }}
+
+annotation class ImageDownloadService
