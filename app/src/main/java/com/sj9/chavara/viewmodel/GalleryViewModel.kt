@@ -19,6 +19,10 @@ class GalleryViewModel(
 
     val familyMembers: StateFlow<List<FamilyMember>> = repository.familyMembers
 
+    // **FIX:** Directly expose the repository's loading state.
+    // This ensures a single source of truth and prevents the UI from getting stuck.
+    val isLoading: StateFlow<Boolean> = repository.isLoading
+
     // This is the primary property your UI will use. It automatically filters photos/videos.
     val filteredGalleryItems: StateFlow<List<GalleryItem>> =
         combine(familyMembers, galleryFilter) { members, filter ->
@@ -58,17 +62,12 @@ class GalleryViewModel(
     fun setFilter(filter: GalleryFilter) {
         _galleryFilter.value = filter
     }
-    private val _isLoading = MutableStateFlow(true)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     init {
-
+        // The repository is initialized to trigger the data fetch.
+        // The UI will now react to the isLoading state from the repository itself.
         viewModelScope.launch {
             repository.initialize()
-            repository.familyMembers.collect { members ->
-                // Once we receive the list of members, loading is complete.
-                _isLoading.value = false
-            }
         }
     }
     // Helper functions that were in GalleryManager

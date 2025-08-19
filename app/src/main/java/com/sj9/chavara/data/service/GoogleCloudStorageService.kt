@@ -11,6 +11,9 @@ import com.google.gson.JsonSyntaxException
 
 import com.sj9.chavara.data.model.FamilyMember
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 
 /**
@@ -131,104 +134,43 @@ class GoogleCloudStorageService(private val context: Context) {
         }
     }
 
-    suspend fun loadFamilyMembers(): List<FamilyMember> = withContext(Dispatchers.IO) {
+    /**
+     * **NEW:** Loads family members as a Flow, emitting each member as it's fetched and parsed.
+     * This allows the UI to update incrementally for a much faster perceived load time.
+     */
+    fun loadFamilyMembersFlow(): Flow<FamilyMember> = flow {
         try {
             val storage = getStorage()
             if (storage == null) {
                 Log.e(TAG, "Storage is null - cannot proceed with loading family members")
-                return@withContext emptyList()
+                return@flow
             }
 
-            Log.d(TAG, "Storage initialized, starting to list blobs with prefix: 'family-members/member_'")
-            Log.d(TAG, "Using bucket: $BUCKET_NAME")
+            Log.d(TAG, "Starting to stream blobs with prefix: 'family-members/member_'")
+            val blobPage = storage.list(BUCKET_NAME, Storage.BlobListOption.prefix("family-members/member_"))
+            val blobs = blobPage.iterateAll()
 
-            // Test bucket existence first
-            // Test bucket existence first
-            try {
-                Log.d(TAG, "Checking if bucket '$BUCKET_NAME' exists...")
-                val bucket = storage.get(BUCKET_NAME)
-                if (bucket == null) {
-                    Log.e(TAG, "Bucket '$BUCKET_NAME' does not exist or is not accessible")
-                    return@withContext emptyList()
-                }
-                Log.d(TAG, "Bucket '$BUCKET_NAME' exists and is accessible")
-                Log.d(TAG, "Bucket location: ${bucket.location}")
-                Log.d(TAG, "Bucket storage class: ${bucket.storageClass}")
-            } catch (e: com.google.cloud.storage.StorageException) {
-                Log.e(TAG, "StorageException checking bucket existence")
-                Log.e(TAG, "Error code: ${e.code}")
-                Log.e(TAG, "Error message: ${e.message}")
-                Log.e(TAG, "Reason: ${e.reason}")
-                Log.e(TAG, "Is retryable: ${e.isRetryable}")
-                Log.e(TAG, "Full exception:", e)
-                return@withContext emptyList()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error checking bucket existence", e)
-                Log.e(TAG, "Exception type: ${e.javaClass.simpleName}")
-                Log.e(TAG, "Exception message: ${e.message}")
-                e.printStackTrace()
-                return@withContext emptyList()
-            }
-
-            // Try to list blobs
-            val members = mutableListOf<FamilyMember>()
-            try {
-                Log.d(TAG, "Attempting to list blobs...")
-                val blobPage = storage.list(BUCKET_NAME, Storage.BlobListOption.prefix("family-members/member_"))
-                Log.d(TAG, "Got blob page, attempting to iterate...")
-
-                val blobs = blobPage.iterateAll()
-                Log.d(TAG, "Successfully got blob iterator")
-
-                var blobCount = 0
-                for (blob in blobs) {
-                    blobCount++
-                    Log.d(TAG, "Processing blob #$blobCount: ${blob.name}")
-
-                    if (blob.name.endsWith("/family_members.json")) {
-                        Log.d(TAG, "Skipping main list file: ${blob.name}")
-                        continue
-                    }
-
-                    try {
-                        val content = String(blob.getContent())
-                        val member = gson.fromJson(content, FamilyMember::class.java)
-                        members.add(member)
-                        Log.d(TAG, "Successfully parsed member: ${member.name} from ${blob.name}")
-                    } catch (e: JsonSyntaxException) {
-                        Log.e(TAG, "Failed to parse member JSON for blob: ${blob.name}", e)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to process blob: ${blob.name}", e)
-                    }
+            for (blob in blobs) {
+                if (blob.name.endsWith("/family_members.json")) {
+                    continue // Skip the main list file
                 }
 
-                Log.d(TAG, "Finished processing. Total blobs found: $blobCount, Members loaded: ${members.size}")
-
-            } catch (e: com.google.cloud.storage.StorageException) {
-                Log.e(TAG, "GCS StorageException occurred")
-                Log.e(TAG, "Error code: ${e.code}")
-                Log.e(TAG, "Error message: ${e.message}")
-                Log.e(TAG, "Is retryable: ${e.isRetryable}")
-                Log.e(TAG, "Full exception:", e)
-                return@withContext emptyList()
-            } catch (e: Exception) {
-                Log.e(TAG, "Unexpected exception during blob listing", e)
-                Log.e(TAG, "Exception type: ${e.javaClass.simpleName}")
-                Log.e(TAG, "Exception message: ${e.message}")
-                e.printStackTrace()
-                return@withContext emptyList()
+                try {
+                    val content = String(blob.getContent())
+                    val member = gson.fromJson(content, FamilyMember::class.java)
+                    emit(member) // Emit each member as it's processed
+                } catch (e: JsonSyntaxException) {
+                    Log.e(TAG, "Failed to parse member JSON for blob: ${blob.name}", e)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to process blob: ${blob.name}", e)
+                }
             }
-
-            return@withContext members
-
+            Log.d(TAG, "Finished streaming blobs.")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load family members with a critical error.", e)
-            Log.e(TAG, "Exception type: ${e.javaClass.simpleName}")
-            Log.e(TAG, "Exception message: ${e.message}")
-            e.printStackTrace()
-            return@withContext emptyList()
+            Log.e(TAG, "Failed to load family members with a critical error in flow.", e)
         }
-    }
+    }.flowOn(Dispatchers.IO)
+
 
     suspend fun saveFamilyMember(member: FamilyMember): Boolean = withContext(Dispatchers.IO) {
         try {
@@ -417,5 +359,3 @@ class GoogleCloudStorageService(private val context: Context) {
         }
     }
 }
-
-
