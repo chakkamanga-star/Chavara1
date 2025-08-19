@@ -26,6 +26,7 @@ googleAuthLibrary = "1.19.0"
 gsonVersion = "2.10.1"
 googleHttpClientGson = "1.45.0"
 kotlinxCoroutines = "1.7.3"
+workRuntimeKtx = "2.9.0"
 
 
 [libraries]
@@ -37,6 +38,7 @@ androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = 
 
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycleViewmodelCompose" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleViewmodelCompose" }
+androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
 google-api-client-android = { module = "com.google.api-client:google-api-client-android", version.ref = "googleApiClient" }
 google-api-services-sheets = { module = "com.google.apis:google-api-services-sheets", version.ref = "googleSheetsApi" }
 google-cloud-storage = { module = "com.google.cloud:google-cloud-storage", version.ref = "googleCloudStorage" }

@@ -68,6 +68,7 @@ dependencies {
     implementation(libs.google.auth.library.oauth2.http)
     implementation(libs.gson)
     implementation(libs.google.http.client.gson)
+    implementation(libs.androidx.work.runtime.ktx)
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)
