@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-
 class ChavaraRepository(context: Context) {
     private val sharedPrefs: SharedPreferences =
         context.getSharedPreferences("chavara_prefs", Context.MODE_PRIVATE)
@@ -85,44 +84,37 @@ class ChavaraRepository(context: Context) {
                         try {
                             val imageData = imageDownloadService.downloadImage(member.photoUrl)
                             if (imageData != null) {
-                                Log.d("ChavaraRepo", "Download successful for ${member.name}. File size: ${imageData.size} bytes.")
-                                val fileName = imageDownloadService.generateImageFileName(member.photoUrl, member.id)
-                                val contentType = imageDownloadService.getMimeType(member.photoUrl)
-                                Log.d("ChavaraRepo", "Uploading image for ${member.name} to GCS as '$fileName'")
-                                val gcsUrl = googleCloudStorageService.uploadMediaFile(fileName, imageData, contentType)
+                                val fileName = imageDownloadService.generateImageFileName(member.id, imageData.mimeType)
+                                val gcsUrl = googleCloudStorageService.uploadMediaFile(fileName, imageData.data, imageData.mimeType)
 
                                 if (gcsUrl != null) {
                                     Log.d("ChavaraRepo", "Upload successful. GCS URL: $gcsUrl")
                                     member.copy(photoUrl = gcsUrl)
                                 } else {
                                     Log.e("ChavaraRepo", "Failed to upload photo for ${member.name} to GCS.")
-                                    onProgress("Failed to upload photo for ${member.name} to GCS.")
+                                    onProgress("Failed to upload photo for ${member.name}.")
                                     member
                                 }
                             } else {
-                                Log.e("ChavaraRepo", "Failed to download image for ${member.name}. The download service returned null.")
-                                onProgress("Failed to download photo for ${member.name}. URL may be invalid.")
+                                Log.e("ChavaraRepo", "Failed to download image for ${member.name}.")
+                                onProgress("Failed to download photo for ${member.name}.")
                                 member
                             }
                         } catch (e: Exception) {
                             onProgress("Error processing photo for ${member.name}")
-                            Log.e("ChavaraRepo", "Error during image download/upload for ${member.name}: ${e.message}", e)
+                            Log.e("ChavaraRepo", "Error during image download/upload for ${member.name}", e)
                             member
                         }
                     } else {
-                        Log.d("ChavaraRepo", "Skipping image download for ${member.name} as URL is not valid.")
                         member
                     }
                 }
 
-                // Video downloading is not a core part of this feature, so it is made optional.
-                // You can add similar logic here if you want to support it later.
-
-                val saveListResult = newMembers.map { member ->
+                val saveResults = newMembers.map { member ->
                     googleCloudStorageService.saveFamilyMember(member)
                 }
 
-                if (saveListResult.all { it }) {
+                if (saveResults.all { it }) {
                     _familyMembers.value = newMembers
                     sharedPrefs.edit {
                         putString("last_spreadsheet_url", spreadsheetUrl)
@@ -136,7 +128,7 @@ class ChavaraRepository(context: Context) {
                 Result.failure(Exception("No data found in the spreadsheet"))
             }
         } catch (e: Exception) {
-            Log.e("ChavaraRepo", "Error during spreadsheet fetch: ${e.message}", e)
+            Log.e("ChavaraRepo", "Error during spreadsheet fetch", e)
             Result.failure(e)
         } finally {
             _isLoading.value = false
@@ -144,34 +136,30 @@ class ChavaraRepository(context: Context) {
     }
 
     fun getTodaysBirthdayMembers(): List<FamilyMember> {
-        return _familyMembers.value.filter { member -> member.isBirthdayToday() }
+        return _familyMembers.value.filter { it.isBirthdayToday() }
     }
 
     fun getMembersByMonth(): Map<Int, List<FamilyMember>> {
-        return _familyMembers.value.groupBy { member -> member.getBirthMonth() }
+        return _familyMembers.value.groupBy { it.getBirthMonth() }
     }
 
     suspend fun saveFamilyMember(member: FamilyMember): Boolean {
         _isLoading.value = true
         return try {
-            val googleCloudStorageService = this.googleCloudStorageService ?: return false
-            val savedIndividual = googleCloudStorageService.saveFamilyMember(member)
-            if (savedIndividual) {
+            val success = googleCloudStorageService?.saveFamilyMember(member) ?: false
+            if (success) {
                 val currentMembers = _familyMembers.value.toMutableList()
                 val existingIndex = currentMembers.indexOfFirst { it.id == member.id }
-                if (existingIndex >= 0) {
+                if (existingIndex != -1) {
                     currentMembers[existingIndex] = member
                 } else {
                     currentMembers.add(member)
                 }
                 _familyMembers.value = currentMembers
-                true
-            } else {
-                Log.e("ChavaraRepo", "Failed to save individual member file.")
-                false
             }
+            success
         } catch (e: Exception) {
-            Log.e("ChavaraRepo", "Error saving member: ${e.message}", e)
+            Log.e("ChavaraRepo", "Error saving member: ${member.id}", e)
             false
         } finally {
             _isLoading.value = false
@@ -180,48 +168,41 @@ class ChavaraRepository(context: Context) {
 
     suspend fun deleteFamilyMember(memberId: Int): Boolean {
         return try {
-            val googleCloudStorageService = this.googleCloudStorageService ?: return false
-            val deleted = googleCloudStorageService.deleteFamilyMember(memberId)
+            val deleted = googleCloudStorageService?.deleteFamilyMember(memberId) ?: false
             if (deleted) {
-                val currentMembers = _familyMembers.value.toMutableList()
-                currentMembers.removeAll { it.id == memberId }
-                _familyMembers.value = currentMembers
+                _familyMembers.value = _familyMembers.value.filter { it.id != memberId }
             }
             deleted
         } catch (e: Exception) {
-            Log.e("ChavaraRepo", "Error deleting member: ${e.message}", e)
+            Log.e("ChavaraRepo", "Error deleting member: $memberId", e)
             false
         }
     }
 
     suspend fun saveUserProfile(profile: FamilyMember): Boolean {
         return try {
-            val googleCloudStorageService = this.googleCloudStorageService ?: return false
-            val saved = googleCloudStorageService.saveUserProfile(profile.copy(isCurrentUserProfile = true))
+            val saved = googleCloudStorageService?.saveUserProfile(profile.copy(isCurrentUserProfile = true)) ?: false
             if (saved) {
                 _userProfile.value = profile
             }
             saved
         } catch (e: Exception) {
-            Log.e("ChavaraRepo", "Error saving user profile: ${e.message}", e)
+            Log.e("ChavaraRepo", "Error saving user profile", e)
             false
         }
     }
 
     suspend fun resetAppData(): Boolean {
         return try {
-            val cloudReset = googleCloudStorageService?.resetAllData() ?: true
+            val cloudReset = googleCloudStorageService?.resetAllData() ?: false
             if (cloudReset) {
                 _familyMembers.value = emptyList()
                 _userProfile.value = null
                 sharedPrefs.edit { clear() }
-                Log.d("ChavaraRepo", "Local data reset successfully.")
-            } else {
-                Log.w("ChavaraRepo", "Cloud data reset failed. Local data NOT reset to prevent inconsistency.")
             }
             cloudReset
         } catch (e: Exception) {
-            Log.e("ChavaraRepo", "Exception during resetAppData", e)
+            Log.e("ChavaraRepo", "Exception during app data reset", e)
             false
         }
     }
@@ -243,8 +224,7 @@ class ChavaraRepository(context: Context) {
                 chavaraPart = sheetRow.chavaraPart,
                 photoUrl = sheetRow.originalPhotoUrl,
                 videoUrl = sheetRow.originalVideoUrl,
-                submissionDate = sheetRow.submissionDate,
-                isCurrentUserProfile = false
+                submissionDate = sheetRow.submissionDate
             )
         }
     }
@@ -252,10 +232,10 @@ class ChavaraRepository(context: Context) {
     fun getLastSyncInfo(): Pair<String?, Long> {
         val url = sharedPrefs.getString("last_spreadsheet_url", null)
         val time = sharedPrefs.getLong("last_sync_time", 0L)
-        return Pair(url, time)
+        return url to time
     }
 
     fun getNewFamilyMemberId(): Int {
-        val currentMaxId = _familyMembers.value.maxByOrNull { it.id }?.id ?: 0
-        return currentMaxId + 1
-    }}
+        return (_familyMembers.value.maxByOrNull { it.id }?.id ?: 0) + 1
+    }
+}
