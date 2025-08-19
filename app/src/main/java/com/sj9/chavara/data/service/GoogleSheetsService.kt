@@ -16,6 +16,7 @@ import kotlinx.coroutines.withContext
  */
 data class SheetRowData(
     val rowIndex: Int, // Original row index in the sheet (for reference/logging)
+    val submissionDate: String, // The first column is often the timestamp
     val name: String,
     val course: String,
     val birthday: String,
@@ -31,6 +32,17 @@ class GoogleSheetsService(private val context: Context) {
 
     companion object {
         private const val TAG = "GoogleSheetsService"
+        // Define constants for the expected column names from your Google Form responses
+        private const val SUBMISSION_DATE_COLUMN = "Timestamp"
+        private const val NAME_COLUMN = "Name"
+        private const val COURSE_COLUMN = "Course"
+        private const val BIRTHDAY_COLUMN = "Birthday"
+        private const val PHONE_NUMBER_COLUMN = "Phone Number"
+        private const val RESIDENCE_COLUMN = "Residence"
+        private const val EMAIL_ADDRESS_COLUMN = "Email Address"
+        private const val CHAVARA_PART_COLUMN = "How do you want to be part of Chavara Youth?"
+        private const val PHOTO_URL_COLUMN = "Photo URL (Google Drive link)"
+        private const val VIDEO_URL_COLUMN = "Video URL (optional)"
     }
 
     private var _sheetsService: Sheets? = null
@@ -206,7 +218,15 @@ class GoogleSheetsService(private val context: Context) {
                 return@withContext emptyList<SheetRowData>()
             }
 
-            Log.d(TAG, "Found ${values.size} raw rows of data.")
+            // Extract the header row
+            val headerRow = values[0].map { it.toString().trim() }
+            val headerMap = headerRow.mapIndexed { index, title -> title to index }.toMap()
+
+            // Log the detected header mapping for debugging
+            Log.d(TAG, "Detected headers: $headerRow")
+            Log.d(TAG, "Header to index map: $headerMap")
+
+            Log.d(TAG, "Found ${values.size - 1} data rows.")
             if (values.size <= 1) { // Only header or empty
                 Log.w(TAG, "Spreadsheet contains no data rows (only header or empty).")
                 onProgress("Spreadsheet contains no data rows.")
@@ -218,14 +238,25 @@ class GoogleSheetsService(private val context: Context) {
 
             for (i in 1 until values.size) { // Start from 1 to skip header
                 val row = values[i]
-                Log.d(TAG, "Processing sheet row ${i + 1} (index $i): $row")
+                Log.d(TAG, "Processing row #$i (data row ${i+1}): $row")
 
                 if (row.isNullOrEmpty()) {
                     Log.w(TAG, "Skipping empty row at sheet row ${i + 1}")
                     continue
                 }
 
-                val name = getValueAt(row, 0)
+                // Use the header map to get the correct column index for each field
+                val submissionDate = getValueAt(row, headerMap[SUBMISSION_DATE_COLUMN])
+                val name = getValueAt(row, headerMap[NAME_COLUMN])
+                val course = getValueAt(row, headerMap[COURSE_COLUMN])
+                val birthday = getValueAt(row, headerMap[BIRTHDAY_COLUMN])
+                val phoneNumber = getValueAt(row, headerMap[PHONE_NUMBER_COLUMN])
+                val residence = getValueAt(row, headerMap[RESIDENCE_COLUMN])
+                val emailAddress = getValueAt(row, headerMap[EMAIL_ADDRESS_COLUMN])
+                val chavaraPart = getValueAt(row, headerMap[CHAVARA_PART_COLUMN])
+                val originalPhotoUrl = getValueAt(row, headerMap[PHOTO_URL_COLUMN])
+                val originalVideoUrl = getValueAt(row, headerMap[VIDEO_URL_COLUMN])
+
                 if (name.isEmpty()) {
                     Log.w(TAG, "Skipping row at sheet row ${i + 1}: Name is empty.")
                     onProgress("Skipping row ${i + 1}: Empty name.")
@@ -236,15 +267,16 @@ class GoogleSheetsService(private val context: Context) {
 
                 val sheetRow = SheetRowData(
                     rowIndex = i,
+                    submissionDate = submissionDate,
                     name = name,
-                    course = getValueAt(row, 1),
-                    birthday = getValueAt(row, 2),
-                    phoneNumber = getValueAt(row, 3),
-                    residence = getValueAt(row, 4),
-                    emailAddress = getValueAt(row, 5),
-                    chavaraPart = getValueAt(row, 6),
-                    originalPhotoUrl = getValueAt(row, 7),
-                    originalVideoUrl = getValueAt(row, 8)
+                    course = course,
+                    birthday = birthday,
+                    phoneNumber = phoneNumber,
+                    residence = residence,
+                    emailAddress = emailAddress,
+                    chavaraPart = chavaraPart,
+                    originalPhotoUrl = originalPhotoUrl,
+                    originalVideoUrl = originalVideoUrl
                 )
                 rawDataList.add(sheetRow)
                 Log.d(TAG, "Added SheetRowData for: $name")
@@ -262,7 +294,10 @@ class GoogleSheetsService(private val context: Context) {
         }
     }
 
-    private fun getValueAt(row: List<Any>, index: Int): String {
+    private fun getValueAt(row: List<Any>, index: Int?): String {
+        if (index == null) {
+            return ""
+        }
         return try {
             if (index < row.size && row[index] != null) {
                 row[index].toString().trim()
@@ -287,7 +322,8 @@ class GoogleSheetsService(private val context: Context) {
 
             val spreadsheetId = extractSpreadsheetId(url)
             if (spreadsheetId == null) {
-                Log.e(TAG, "Invalid URL format for validation: $url")
+                val errorMsg = "Invalid Google Sheets URL format: $url"
+                Log.e(TAG, errorMsg)
                 return@withContext false
             }
 
