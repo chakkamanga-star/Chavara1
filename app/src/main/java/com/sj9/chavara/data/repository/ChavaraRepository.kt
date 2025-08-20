@@ -55,8 +55,9 @@ class ChavaraRepository(private val context: Context) {
                 Log.e("ChavaraRepo", "GoogleCloudStorageService is null, cannot initialize.")
                 return
             }
-            val members = googleCloudStorageService.loadFamilyMembers()
-            _familyMembers.value = members
+            googleCloudStorageService.loadFamilyMembersFlow().collect { member ->
+                _familyMembers.value = _familyMembers.value + member
+            }
             val profile = googleCloudStorageService.loadUserProfile()
             _userProfile.value = profile
         } catch (e: Exception) {

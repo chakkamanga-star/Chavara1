@@ -4,7 +4,7 @@ import android.content.Context
 import coil.ImageLoader
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
-import coil.request.CachePolicy
+
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 

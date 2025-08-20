@@ -118,8 +118,8 @@ fun AsyncMemberImage(
                             onSuccess = { _, _ ->
                                 Log.d("AsyncMemberImage", "Successfully loaded image for $memberName")
                             },
-                            onError = { _, throwable ->
-                                Log.e("AsyncMemberImage", "Failed to load image for $memberName", throwable.throwable)
+                            onError = { _, result ->
+                                Log.e("AsyncMemberImage", "Failed to load image for $memberName", result.throwable)
                             }
                         )
                         .build()
