@@ -1,5 +1,6 @@
 package com.sj9.chavara.navigation
 
+import android.app.Application
 import android.content.Context
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
@@ -37,7 +38,9 @@ import com.sj9.chavara.viewmodel.CalendarViewModel
 import com.sj9.chavara.viewmodel.*
 
 @Suppress("UNCHECKED_CAST")
-class ViewModelFactory(private val repository: ChavaraRepository) : ViewModelProvider.Factory {
+// This ViewModelFactory is now the single source for creating all ViewModels in the app.
+// It ensures they all share the same repository instance.
+class ViewModelFactory(private val application: Application, private val repository: ChavaraRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return when {
             modelClass.isAssignableFrom(MyViewModel::class.java) -> MyViewModel(repository) as T
@@ -45,7 +48,8 @@ class ViewModelFactory(private val repository: ChavaraRepository) : ViewModelPro
             modelClass.isAssignableFrom(GalleryViewModel::class.java) -> GalleryViewModel(repository) as T
             modelClass.isAssignableFrom(ProfileViewModel::class.java) -> ProfileViewModel(repository) as T
             modelClass.isAssignableFrom(CalendarViewModel::class.java) -> CalendarViewModel(repository) as T
-            modelClass.isAssignableFrom(SpreadsheetViewModel::class.java) -> SpreadsheetViewModel(repository) as T
+            // It correctly provides the Application context to the SpreadsheetViewModel.
+            modelClass.isAssignableFrom(SpreadsheetViewModel::class.java) -> SpreadsheetViewModel(application, repository) as T
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }
     }
@@ -71,8 +75,12 @@ fun AppNavigation(
     navController: NavHostController = rememberNavController()
 ) {
     val context = LocalContext.current
-    val repository = remember { ChavaraRepository(context) }
-    val viewModelFactory = remember { ViewModelFactory(repository) }
+    // Get the application context, which is needed for the ViewModelFactory.
+    val application = context.applicationContext as Application
+    // Create a single, remembered instance of the repository to be shared.
+    val repository = remember { ChavaraRepository(application) }
+    // Create the single factory instance.
+    val viewModelFactory = remember { ViewModelFactory(application, repository) }
     val sharedPrefs = remember { context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE) }
     val startDestination = if (sharedPrefs.getBoolean("onboarding_complete", false)) AppDestinations.HOME else AppDestinations.SPLASH
 
@@ -96,10 +104,9 @@ fun AppNavigation(
         }
 
         composable(AppDestinations.HOME) {
-            // FIX: HomeScreen does not take a ViewModel. It creates its own repository.
             val myViewModel: MyViewModel = viewModel(factory = viewModelFactory)
             HomeScreen(
-                viewModel = myViewModel, // Pass the ViewModel to the HomeScreen
+                viewModel = myViewModel,
                 onOrientationClick = { navController.navigate(AppDestinations.GALLERY_ROUTE) },
                 onCalendarClick = { navController.navigate(AppDestinations.CALENDAR_ROUTE) },
                 onProfileClick = { navController.navigate(AppDestinations.PROFILE_ROUTE) },
@@ -109,7 +116,7 @@ fun AppNavigation(
         }
 
         composable(AppDestinations.SPREADSHEET) {
-            // Use the factory to correctly create the ViewModel
+            // The factory creates the ViewModel with the correct dependencies.
             val spreadsheetViewModel: SpreadsheetViewModel = viewModel(factory = viewModelFactory)
             SpreadsheetScreen(
                 viewModel = spreadsheetViewModel,
@@ -169,11 +176,10 @@ fun AppNavigation(
             composable("family_detail/{memberId}") { backStackEntry ->
                 val memberIdString = backStackEntry.arguments?.getString("memberId") ?: "0"
                 val isNewMember = memberIdString == "new"
-                // **FIX: Pass the ViewModel to the FamilyMemberScreen**
                 val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(AppDestinations.FAMILY_ROUTE) }
                 val familyViewModel: FamilyMembersViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = viewModelFactory)
                 FamilyMemberScreen(
-                    viewModel = familyViewModel, // Pass the shared ViewModel
+                    viewModel = familyViewModel,
                     isNewMember = isNewMember,
                     memberId = if (isNewMember) -1 else memberIdString.toIntOrNull() ?: 0,
                     onEditPhotoClick = { navController.navigate("family_photo_edit/$memberIdString") },

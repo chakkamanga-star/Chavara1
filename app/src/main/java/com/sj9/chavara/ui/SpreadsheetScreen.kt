@@ -6,10 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.Text // Keep Material 3 Text
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -17,30 +15,26 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-// import androidx.compose.ui.platform.LocalContext // Not needed directly if ViewModel handles context
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel // Import for viewModel()
 import com.sj9.chavara.R
 import com.sj9.chavara.ui.theme.ChavaraTheme
 import com.sj9.chavara.ui.theme.ris
 import com.sj9.chavara.ui.utils.*
 import com.sj9.chavara.viewmodel.SpreadsheetViewModel
-// import com.sj9.chavara.data.repository.ChavaraRepository // No longer directly used here
+import com.sj9.chavara.ui.utils.SpreadsheetUiState
+import androidx.lifecycle.viewmodel.compose.viewModel
+
 
 @Composable
 fun SpreadsheetScreen(
     modifier: Modifier = Modifier,
-    viewModel: SpreadsheetViewModel = viewModel(), // Inject ViewModel
-    onProcessComplete: () -> Unit = {} // Renamed for clarity, called on success
+    viewModel: SpreadsheetViewModel, // ViewModel is now non-nullable and passed from navigation
+    onProcessComplete: () -> Unit = {}
 ) {
-    // val context = LocalContext.current // ViewModel handles context now
-    // No longer instantiating repository directly here
-    val coroutineScope = rememberCoroutineScope() // Still useful for UI-specific coroutines if any
-
     var spreadsheetUrl by remember { mutableStateOf("") }
     val uiState by viewModel.uiState.collectAsState()
 
@@ -48,7 +42,7 @@ fun SpreadsheetScreen(
     LaunchedEffect(key1 = viewModel.navigationEvent.collectAsState().value) {
         if (viewModel.navigationEvent.value) {
             onProcessComplete()
-            viewModel.resetNavigationEvent() // Reset the event after handling
+            viewModel.resetNavigationEvent()
         }
     }
 
@@ -72,7 +66,6 @@ fun SpreadsheetScreen(
     var messageText by remember { mutableStateOf("") }
     var messageColor by remember { mutableStateOf(Color.White) }
 
-
     // Update local isLoading and message based on uiState
     LaunchedEffect(uiState) {
         isLoading = uiState is SpreadsheetUiState.Loading
@@ -83,18 +76,17 @@ fun SpreadsheetScreen(
             }
             is SpreadsheetUiState.Success -> {
                 messageText = currentState.successMessage
-                messageColor = Color.White // Or a specific success color like Green
+                messageColor = Color(0xFF4CAF50) // Success green
             }
             is SpreadsheetUiState.Error -> {
                 messageText = currentState.errorMessage
-                messageColor = Color.Red
+                messageColor = Color(0xFFFF5252) // Error red
             }
             SpreadsheetUiState.Idle -> {
-                messageText = "" // Clear message when idle
+                messageText = ""
             }
         }
     }
-
 
     BoxWithConstraints(
         modifier = modifier
@@ -134,7 +126,7 @@ fun SpreadsheetScreen(
                 value = spreadsheetUrl,
                 onValueChange = {
                     spreadsheetUrl = it
-                    if (uiState !is SpreadsheetUiState.Loading) { // Allow clearing message on new input
+                    if (uiState !is SpreadsheetUiState.Loading) {
                         viewModel.clearMessage()
                     }
                 },
@@ -180,7 +172,6 @@ fun SpreadsheetScreen(
             // Empty box, text is positioned separately
         }
 
-
         Text(
             text = if (isLoading) "Loading..." else "Save",
             color = Color.White,
@@ -209,6 +200,34 @@ fun SpreadsheetScreen(
                     .fillMaxWidth(0.8f)
             )
         }
+
+        // Add a cancel button when loading
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.25f)
+                    .height(dimensions.screenHeight * 0.05f)
+                    .offset(
+                        x = dimensions.horizontalPadding * 5f,
+                        y = dimensions.screenHeight * 0.47f
+                    )
+                    .clip(RoundedCornerShape(dimensions.cornerRadius))
+                    .alpha(0.8f)
+                    .background(Color(0xFFFF5252))
+                    .clickable {
+                        viewModel.cancelSync()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Cancel",
+                    color = Color.White,
+                    fontFamily = ris,
+                    fontSize = responsiveFontSize(14f),
+                    fontWeight = FontWeight.Normal
+                )
+            }
+        }
     }
 }
 
@@ -216,10 +235,8 @@ fun SpreadsheetScreen(
 @Composable
 fun SpreadsheetScreenPreview() {
     ChavaraTheme {
-        // Preview will use a default ViewModel instance.
-        // For more complex previews with specific ViewModel states,
-        // you might need to mock the ViewModel or pass a preview-specific instance.
-        SpreadsheetScreen()
+        // This preview will not fully function without a real ViewModel instance.
+        // For a more interactive preview, you would mock the ViewModel.
+        SpreadsheetScreen(viewModel = viewModel())
     }
 }
-

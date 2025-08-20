@@ -8,17 +8,17 @@ import com.google.cloud.storage.Storage
 import com.google.cloud.storage.StorageOptions
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
-
 import com.sj9.chavara.data.model.FamilyMember
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
 
 /**
  * Service class for interacting with Google Cloud Storage
- * Handles low-level storage operations
+ * Handles low-level storage operations with enhanced, detailed logging.
  */
 class GoogleCloudStorageService(private val context: Context) {
 
@@ -37,21 +37,18 @@ class GoogleCloudStorageService(private val context: Context) {
                 Log.d(TAG, "Attempting to get GCS credentials...")
                 val credentials = ServiceAccountManager.getGcsCredentials(context)
                 if (credentials != null) {
-                    Log.d(TAG, "Credentials obtained successfully")
+                    Log.d(TAG, "Credentials obtained successfully.")
                     _storage = StorageOptions.newBuilder()
                         .setCredentials(credentials)
-                        .setProjectId("velvety-network-468011-t2") // Add explicit project ID
+                        .setProjectId("velvety-network-468011-t2") // Explicit project ID
                         .build()
                         .service
-                    Log.d(TAG, "GCS service initialized successfully.")
+                    Log.i(TAG, "GCS service initialized successfully.")
                 } else {
-                    Log.e(TAG, "GCS credentials are null - check ServiceAccountManager implementation")
+                    Log.e(TAG, "GCS credentials are null - check ServiceAccountManager implementation.")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to initialize GCS", e)
-                Log.e(TAG, "Exception type: ${e.javaClass.simpleName}")
-                Log.e(TAG, "Exception message: ${e.message}")
-                e.printStackTrace()
                 _storage = null
             } finally {
                 _storageInitialized = true
@@ -59,303 +56,180 @@ class GoogleCloudStorageService(private val context: Context) {
         }
         return _storage
     }
-    suspend fun testBucketAccess(): Boolean = withContext(Dispatchers.IO) {
-        try {
-            // Test if bucket allows public access
-            val testUrl = "https://storage.googleapis.com/chakka/test-file.txt"
-            val connection = java.net.URL(testUrl).openConnection() as java.net.HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
-
-            val responseCode = connection.responseCode
-            Log.d(TAG, "Public access test response code: $responseCode")
-
-            when (responseCode) {
-                200, 404 -> {
-                    Log.d(TAG, "Bucket is publicly accessible")
-                    true
-                }
-                403 -> {
-                    Log.e(TAG, "Bucket is NOT publicly accessible - need to enable public access")
-                    false
-                }
-                else -> {
-                    Log.w(TAG, "Unexpected response code: $responseCode")
-                    false
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error testing bucket access", e)
-            false
-        }
-    }
 
     suspend fun getAuthenticatedImageUrl(gcsUrl: String): String? = withContext(Dispatchers.IO) {
-        try {
-            if (!gcsUrl.startsWith("gs://")) return@withContext null
+        Log.d(TAG, "getAuthenticatedImageUrl called for: $gcsUrl")
+        if (!gcsUrl.startsWith("gs://")) {
+            Log.w(TAG, "Invalid GCS URL format: $gcsUrl")
+            return@withContext null
+        }
 
+        try {
             val urlParts = gcsUrl.removePrefix("gs://").split("/", limit = 2)
-            if (urlParts.size != 2) return@withContext null
+            if (urlParts.size != 2) {
+                Log.e(TAG, "Invalid GCS URL structure: $gcsUrl")
+                return@withContext null
+            }
 
             val bucketName = urlParts[0]
             val objectPath = urlParts[1]
+            Log.d(TAG, "Parsed GCS URL -> Bucket: $bucketName, Object: $objectPath")
 
             getStorage()?.let { storage ->
                 val blobId = BlobId.of(bucketName, objectPath)
                 val blob = storage.get(blobId)
 
                 if (blob != null && blob.exists()) {
-                    val signedUrl = blob.signUrl(1, java.util.concurrent.TimeUnit.HOURS)
-                    signedUrl.toString()
+                    Log.d(TAG, "Blob found for: $gcsUrl. Generating signed URL.")
+                    val signedUrl = blob.signUrl(1, TimeUnit.HOURS)
+                    Log.i(TAG, "Successfully generated signed URL for $gcsUrl")
+                    return@withContext signedUrl.toString()
                 } else {
-                    Log.w(TAG, "Blob does not exist: $gcsUrl")
-                    null
+                    Log.w(TAG, "Blob does not exist at path: $gcsUrl")
+                    return@withContext null
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error generating signed URL for: $gcsUrl", e)
-            null
+            return@withContext null
         }
     }
 
-    suspend fun saveFamilyMembers(familyMembers: List<FamilyMember>): Boolean = withContext(Dispatchers.IO) {
-        try {
-            getStorage()?.let { storage ->
-                val json = gson.toJson(familyMembers)
-                val blobId = BlobId.of(BUCKET_NAME, "family-members/family_members.json")
-                val blobInfo = BlobInfo.newBuilder(blobId).setContentType("application/json").build()
-                storage.create(blobInfo, json.toByteArray())
-                true
-            } ?: false
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to save family members list", e)
-            false
-        }
-    }
-
-    /**
-     * **NEW:** Loads family members as a Flow, emitting each member as it's fetched and parsed.
-     * This allows the UI to update incrementally for a much faster perceived load time.
-     */
     fun loadFamilyMembersFlow(): Flow<FamilyMember> = flow {
+        Log.d(TAG, "loadFamilyMembersFlow: Initiating flow.")
         try {
             val storage = getStorage()
             if (storage == null) {
-                Log.e(TAG, "Storage is null - cannot proceed with loading family members")
+                Log.e(TAG, "loadFamilyMembersFlow: Storage is null, aborting.")
                 return@flow
             }
 
-            Log.d(TAG, "Starting to stream blobs with prefix: 'family-members/member_'")
+            Log.d(TAG, "loadFamilyMembersFlow: Streaming blobs with prefix 'family-members/member_'.")
             val blobPage = storage.list(BUCKET_NAME, Storage.BlobListOption.prefix("family-members/member_"))
             val blobs = blobPage.iterateAll()
 
             for (blob in blobs) {
-                if (blob.name.endsWith("/family_members.json")) {
-                    continue // Skip the main list file
-                }
-
                 try {
                     val content = String(blob.getContent())
                     val member = gson.fromJson(content, FamilyMember::class.java)
-                    emit(member) // Emit each member as it's processed
+                    Log.d(TAG, "loadFamilyMembersFlow: Emitting member ${member.id} - ${member.name}")
+                    emit(member)
                 } catch (e: JsonSyntaxException) {
-                    Log.e(TAG, "Failed to parse member JSON for blob: ${blob.name}", e)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to process blob: ${blob.name}", e)
+                    Log.e(TAG, "loadFamilyMembersFlow: JSON parsing failed for blob: ${blob.name}", e)
                 }
             }
-            Log.d(TAG, "Finished streaming blobs.")
+            Log.i(TAG, "loadFamilyMembersFlow: Finished streaming all member blobs.")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load family members with a critical error in flow.", e)
+            Log.e(TAG, "loadFamilyMembersFlow: A critical error occurred during the flow.", e)
         }
     }.flowOn(Dispatchers.IO)
 
-
     suspend fun saveFamilyMember(member: FamilyMember): Boolean = withContext(Dispatchers.IO) {
+        Log.d(TAG, "saveFamilyMember: Attempting to save member ${member.id} - ${member.name}")
         try {
             getStorage()?.let { storage ->
                 val json = gson.toJson(member)
                 val blobId = BlobId.of(BUCKET_NAME, "family-members/member_${member.id}.json")
                 val blobInfo = BlobInfo.newBuilder(blobId).setContentType("application/json").build()
                 storage.create(blobInfo, json.toByteArray())
-                true
+                Log.i(TAG, "saveFamilyMember: Successfully saved member ${member.id}")
+                return@withContext true
             } ?: false
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to save individual family member", e)
-            false
+            Log.e(TAG, "saveFamilyMember: Failed to save member ${member.id}", e)
+            return@withContext false
         }
     }
 
-    /**
-     * Delete family member data
-     */
     suspend fun deleteFamilyMember(memberId: Int): Boolean = withContext(Dispatchers.IO) {
+        Log.d(TAG, "deleteFamilyMember: Attempting to delete member $memberId")
         try {
-            return@withContext getStorage()?.let { storage ->
+            getStorage()?.let { storage ->
                 val blobId = BlobId.of(BUCKET_NAME, "family-members/member_$memberId.json")
                 storage.delete(blobId)
-                true
+                Log.i(TAG, "deleteFamilyMember: Successfully deleted member $memberId")
+                return@withContext true
             } ?: false
         } catch (e: Exception) {
-            e.printStackTrace()
-            false
+            Log.e(TAG, "deleteFamilyMember: Failed to delete member $memberId", e)
+            return@withContext false
         }
     }
 
-    /**
-     * Save user profile data
-     */
     suspend fun saveUserProfile(userProfile: FamilyMember): Boolean = withContext(Dispatchers.IO) {
+        Log.d(TAG, "saveUserProfile: Attempting to save user profile for ${userProfile.name}")
         try {
-            return@withContext getStorage()?.let { storage ->
+            getStorage()?.let { storage ->
                 val json = gson.toJson(userProfile)
                 val blobId = BlobId.of(BUCKET_NAME, "user-profile/profile.json")
-                val blobInfo = BlobInfo.newBuilder(blobId)
-                    .setContentType("application/json")
-                    .build()
-
+                val blobInfo = BlobInfo.newBuilder(blobId).setContentType("application/json").build()
                 storage.create(blobInfo, json.toByteArray())
-                true
+                Log.i(TAG, "saveUserProfile: Successfully saved user profile.")
+                return@withContext true
             } ?: false
         } catch (e: Exception) {
-            e.printStackTrace()
-            false
+            Log.e(TAG, "saveUserProfile: Failed to save user profile", e)
+            return@withContext false
         }
     }
 
-    /**
-     * Load user profile data
-     */
     suspend fun loadUserProfile(): FamilyMember? = withContext(Dispatchers.IO) {
+        Log.d(TAG, "loadUserProfile: Attempting to load user profile.")
         try {
-            return@withContext getStorage()?.let { storage ->
+            getStorage()?.let { storage ->
                 val blobId = BlobId.of(BUCKET_NAME, "user-profile/profile.json")
                 val blob = storage.get(blobId)
 
                 if (blob != null && blob.exists()) {
                     val content = String(blob.getContent())
-                    gson.fromJson(content, FamilyMember::class.java)
+                    val profile = gson.fromJson(content, FamilyMember::class.java)
+                    Log.i(TAG, "loadUserProfile: Successfully loaded user profile for ${profile.name}")
+                    return@withContext profile
                 } else {
-                    null
+                    Log.w(TAG, "loadUserProfile: User profile not found.")
+                    return@withContext null
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
-            null
+            Log.e(TAG, "loadUserProfile: Failed to load user profile", e)
+            return@withContext null
         }
     }
 
-    /**
-     * Upload media file (photo/video) to Cloud Storage
-     */
-    suspend fun uploadMediaFile(
-        fileName: String,
-        content: ByteArray,
-        contentType: String
-    ): String? = withContext(Dispatchers.IO) {
+    suspend fun uploadMediaFile(fileName: String, content: ByteArray, contentType: String): String? = withContext(Dispatchers.IO) {
+        Log.d(TAG, "uploadMediaFile: Attempting to upload '$fileName' ($contentType)")
         try {
-            return@withContext getStorage()?.let { storage ->
+            getStorage()?.let { storage ->
                 val blobId = BlobId.of(BUCKET_NAME, "media/$fileName")
-                val blobInfo = BlobInfo.newBuilder(blobId)
-                    .setContentType(contentType)
-                    .build()
-
+                val blobInfo = BlobInfo.newBuilder(blobId).setContentType(contentType).build()
                 storage.create(blobInfo, content)
-                "gs://$BUCKET_NAME/media/$fileName" // Return GCS URL
+                val gcsUrl = "gs://$BUCKET_NAME/media/$fileName"
+                Log.i(TAG, "uploadMediaFile: Successfully uploaded '$fileName' to $gcsUrl")
+                return@withContext gcsUrl
             }
         } catch (e: Exception) {
-            e.printStackTrace()
-            null
+            Log.e(TAG, "uploadMediaFile: Failed to upload '$fileName'", e)
+            return@withContext null
         }
     }
 
-    /**
-     * Delete media file from Cloud Storage
-     */
-    suspend fun deleteMediaFile(fileName: String): Boolean = withContext(Dispatchers.IO) {
-        try {
-            return@withContext getStorage()?.let { storage ->
-                val blobId = BlobId.of(BUCKET_NAME, "media/$fileName")
-                storage.delete(blobId)
-                true
-            } ?: false
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
-    }
-
-
-    /**
-     * Download file from Cloud Storage with custom bucket and path
-     */
-    suspend fun downloadFile(bucketName: String, objectPath: String): ByteArray? = withContext(Dispatchers.IO) {
-        try {
-            return@withContext getStorage()?.let { storage ->
-                val blobId = BlobId.of(bucketName, objectPath)
-                val blob = storage.get(blobId)
-
-                if (blob != null && blob.exists()) {
-                    blob.getContent()
-                } else {
-                    null
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
-    }
-
-    /**
-     * Download file from default bucket
-     */
-    suspend fun downloadFileFromDefaultBucket(objectPath: String): ByteArray? =
-        withContext(Dispatchers.IO) {
-            try {
-                return@withContext getStorage()?.let { storage ->
-                    val blobId = BlobId.of(BUCKET_NAME, objectPath) // Using the class property
-                    val blob = storage.get(blobId)
-
-                    if (blob != null && blob.exists()) {
-                        blob.getContent()
-                    } else {
-                        Log.w(
-                            "GCS_Service",
-                            "File not found or does not exist: gs://$BUCKET_NAME/$objectPath"
-                        )
-                        null
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(
-                    "GCS_Service",
-                    "Error downloading file: gs://$BUCKET_NAME/$objectPath",
-                    e
-                )
-                null
-            }
-        }
-
-    /**
-     * Reset all app data (for app reset functionality)
-     */
     suspend fun resetAllData(): Boolean = withContext(Dispatchers.IO) {
+        Log.w(TAG, "resetAllData: Initiating complete data reset.")
         try {
-            return@withContext getStorage()?.let { storage ->
-                // List all objects and delete them
+            getStorage()?.let { storage ->
                 val blobs = storage.list(BUCKET_NAME).iterateAll()
-
+                var count = 0
                 for (blob in blobs) {
                     storage.delete(blob.blobId)
+                    count++
+                    Log.d(TAG, "resetAllData: Deleted blob ${blob.name}")
                 }
-
-                true
+                Log.i(TAG, "resetAllData: Successfully deleted $count blobs.")
+                return@withContext true
             } ?: false
         } catch (e: Exception) {
-            e.printStackTrace()
-            false
+            Log.e(TAG, "resetAllData: Failed during data reset.", e)
+            return@withContext false
         }
     }
 }
