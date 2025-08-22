@@ -37,7 +37,7 @@ fun AsyncMemberImage(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape(cornerRadius))
-            .background(Color(0xFF4EDAE9)),
+            .background(Color(0xA1E9D44E)),
         contentAlignment = Alignment.Center
     ) {
         if (imageUrl.isEmpty()) {

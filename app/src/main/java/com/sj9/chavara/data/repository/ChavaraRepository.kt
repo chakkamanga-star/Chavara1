@@ -72,10 +72,16 @@ class ChavaraRepository(private val context: Context) {
 
             val membersList = mutableListOf<FamilyMember>()
             googleCloudStorageService.loadFamilyMembersFlow().collect { member ->
-                membersList.add(member)
+                // **SOLUTION: Get the signed URL here, in the repository**
+                val signedUrl = if (member.photoUrl.startsWith("gs://")) {
+                    getAuthenticatedImageUrl(member.photoUrl) ?: ""
+                } else {
+                    member.photoUrl
+                }
+                membersList.add(member.copy(photoUrl = signedUrl))
             }
             _familyMembers.value = membersList
-            Log.i("ChavaraRepo", "initialize: Finished loading ${_familyMembers.value.size} members.")
+            Log.i("ChavaraRepo", "initialize: Finished loading and processing ${_familyMembers.value.size} members.")
 
             val profile = googleCloudStorageService.loadUserProfile()
             _userProfile.value = profile
