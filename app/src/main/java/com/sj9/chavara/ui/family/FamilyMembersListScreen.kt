@@ -20,7 +20,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sj9.chavara.R
@@ -28,6 +27,7 @@ import com.sj9.chavara.data.model.FamilyMember
 import com.sj9.chavara.ui.components.AsyncMemberImage
 import com.sj9.chavara.ui.theme.ris
 import com.sj9.chavara.viewmodel.FamilyMembersViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun FamilyMembersListScreen(
@@ -139,12 +139,15 @@ private fun FamilyMemberCard(
     modifier: Modifier = Modifier
 ) {
     var signedImageUrl by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(member.photoUrl) {
-        if (member.photoUrl.startsWith("gs://")) {
-            signedImageUrl = viewModel.getAuthenticatedImageUrl(member.photoUrl)
-        } else {
-            signedImageUrl = member.photoUrl
+        coroutineScope.launch {
+            if (member.photoUrl.startsWith("gs://")) {
+                signedImageUrl = viewModel.getAuthenticatedImageUrl(member.photoUrl)
+            } else {
+                signedImageUrl = member.photoUrl
+            }
         }
     }
     Box(
