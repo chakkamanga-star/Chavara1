@@ -116,7 +116,9 @@ class GalleryViewModel(
         data class Photo(val url: String, val fm: FamilyMember) : GalleryItem(fm)
         data class Video(val url: String, val fm: FamilyMember) : GalleryItem(fm)
     }
-
+    suspend fun getAuthenticatedImageUrl(gcsUrl: String): String? {
+        return repository.getAuthenticatedImageUrl(gcsUrl)
+    }
     enum class GalleryFilter {
         ALL, PHOTOS, VIDEOS
     }

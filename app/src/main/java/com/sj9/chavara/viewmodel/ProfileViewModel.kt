@@ -30,7 +30,9 @@ class ProfileViewModel(
             }
         }
     }
-
+    suspend fun getAuthenticatedImageUrl(gcsUrl: String): String? {
+        return repository.getAuthenticatedImageUrl(gcsUrl)
+    }
     fun resetAppData() {
         viewModelScope.launch {
             _uiState.value = ProfileUiState.Loading

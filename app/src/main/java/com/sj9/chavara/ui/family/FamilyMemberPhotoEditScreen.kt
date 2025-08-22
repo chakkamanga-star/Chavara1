@@ -1,9 +1,9 @@
 package com.sj9.chavara.ui.family
 
-import android.net.Uri // <-- Import Uri
-import androidx.activity.compose.rememberLauncherForActivityResult // <-- Import
-import androidx.activity.result.PickVisualMediaRequest // <-- Import
-import androidx.activity.result.contract.ActivityResultContracts // <-- Import
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,25 +22,30 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage // <-- Import AsyncImage
+import coil.compose.AsyncImage
 import com.sj9.chavara.R
-import com.sj9.chavara.ui.theme.ris // Make sure this import is correct
+import com.sj9.chavara.ui.theme.ris
+import com.sj9.chavara.viewmodel.FamilyMembersViewModel
+import kotlinx.coroutines.launch
+import java.io.InputStream
 
 @Composable
 fun FamilyMemberPhotoEditScreen(
     modifier: Modifier = Modifier,
     memberId: Int,
-    // This lambda is now for when the whole process is done, e.g., after saving the new photo
+    viewModel: FamilyMembersViewModel,
     onDoneEditing: () -> Unit = {},
-    // You might want to pass the initial photo URI if it's already set
     initialPhotoUri: Uri? = null
 ) {
     Log.d("PhotoEditScreen", "Editing photo for member ID: $memberId")
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     // 1. State for the selected image URI
     var selectedImageUri by remember { mutableStateOf(initialPhotoUri) }
@@ -52,9 +57,14 @@ fun FamilyMemberPhotoEditScreen(
             if (uri != null) {
                 selectedImageUri = uri
                 Log.d("PhotoEditScreen", "Photo selected: $uri")
-                // Here, you might want to trigger a save operation or directly call onDoneEditing
-                // For now, let's assume selecting a photo means it's "complete" for this screen's purpose.
-                // If you need a separate save button, you'd call onDoneEditing from that button's click.
+                coroutineScope.launch {
+                    val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
+                    val bytes = inputStream?.readBytes()
+                    inputStream?.close()
+                    if (bytes != null) {
+                        viewModel.uploadMemberPhoto(memberId, bytes, context.contentResolver.getType(uri) ?: "image/jpeg")
+                    }
+                }
             } else {
                 Log.d("PhotoEditScreen", "No photo selected")
             }
@@ -138,16 +148,13 @@ fun FamilyMemberPhotoEditScreen(
                     color = Color.White.copy(alpha = 0.7f),
                     fontFamily = ris,
                     fontSize = 18.sp,
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 16.dp)
                 )
             }
         }
 
-        // "Change Photo" text - can now be a "Done" or "Save" button if needed,
-        // or removed if the main photo area click is enough.
-        // For simplicity, let's make this a "Done" button that calls onDoneEditing.
-        // If you want the photo to be "saved" automatically on selection, this text might not be needed
-        // or could serve a different purpose.
         Text(
             text = "Done", // Changed text
             color = Color.White,
@@ -159,9 +166,6 @@ fun FamilyMemberPhotoEditScreen(
                 .padding(bottom = 70.dp) // Adjust padding
                 .clickable {
                     Log.d("PhotoEditScreen", "Done button clicked.")
-                    // Here you would typically save the selectedImageUri if needed,
-                    // then call onDoneEditing.
-                    // For example: viewModel.saveFamilyMemberPhoto(memberId, selectedImageUri)
                     onDoneEditing() // This will now pop the back stack as defined in navigation
                 }
         )
@@ -172,6 +176,7 @@ fun FamilyMemberPhotoEditScreen(
 @Composable
 fun FamilyMemberPhotoEditScreenPreview() {
     // ChavaraTheme { // Assuming you have a theme
-    FamilyMemberPhotoEditScreen(memberId = 0, onDoneEditing = {})
+    val fakeViewModel = object : FamilyMembersViewModel(repository = TODO()) {}
+    FamilyMemberPhotoEditScreen(memberId = 0, onDoneEditing = {}, viewModel = fakeViewModel)
     // }
 }

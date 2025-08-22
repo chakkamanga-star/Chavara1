@@ -36,7 +36,14 @@ class SpreadsheetViewModel(
             _uiState.update { SpreadsheetUiState.Error("Spreadsheet URL cannot be empty.") }
             return
         }
-        processSpreadsheetWithWorker(url)
+        viewModelScope.launch {
+            _uiState.update { SpreadsheetUiState.Loading("Validating URL...") }
+            if (chavaraRepository.validateSpreadsheetUrl(url)) {
+                processSpreadsheetWithWorker(url)
+            } else {
+                _uiState.update { SpreadsheetUiState.Error("Invalid or inaccessible spreadsheet URL.") }
+            }
+        }
     }
 
     private fun processSpreadsheetWithWorker(url: String) {

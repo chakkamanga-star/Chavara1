@@ -63,7 +63,9 @@ class MyViewModel(
             repository.initialize()
         }
     }
-
+    suspend fun getAuthenticatedImageUrl(gcsUrl: String): String? {
+        return repository.getAuthenticatedImageUrl(gcsUrl)
+    }
     fun getTotalMembersCount(): Int {
         return familyMembers.value.size
     }

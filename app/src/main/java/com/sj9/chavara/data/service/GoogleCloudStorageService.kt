@@ -58,41 +58,44 @@ class GoogleCloudStorageService(private val context: Context) {
     }
 
     suspend fun getAuthenticatedImageUrl(gcsUrl: String): String? = withContext(Dispatchers.IO) {
-        Log.d(TAG, "getAuthenticatedImageUrl called for: $gcsUrl")
+        Log.d("ImageDebug", "[GCS] Attempting to get signed URL for: $gcsUrl")
         if (!gcsUrl.startsWith("gs://")) {
-            Log.w(TAG, "Invalid GCS URL format: $gcsUrl")
+            Log.w("ImageDebug", "[GCS] Invalid GCS URL format. URL must start with 'gs://'.")
             return@withContext null
         }
 
         try {
             val urlParts = gcsUrl.removePrefix("gs://").split("/", limit = 2)
             if (urlParts.size != 2) {
-                Log.e(TAG, "Invalid GCS URL structure: $gcsUrl")
+                Log.e("ImageDebug", "[GCS] Invalid GCS URL structure. Expected gs://<bucket>/<object-path>. URL: $gcsUrl")
                 return@withContext null
             }
 
             val bucketName = urlParts[0]
             val objectPath = urlParts[1]
-            Log.d(TAG, "Parsed GCS URL -> Bucket: $bucketName, Object: $objectPath")
+            Log.d("ImageDebug", "[GCS] Parsed GCS URL -> Bucket: $bucketName, Object: $objectPath")
 
             getStorage()?.let { storage ->
                 val blobId = BlobId.of(bucketName, objectPath)
+                Log.d("ImageDebug", "[GCS] Executing storage.get(blobId) for: $blobId")
                 val blob = storage.get(blobId)
 
                 if (blob != null && blob.exists()) {
-                    Log.d(TAG, "Blob found for: $gcsUrl. Generating signed URL.")
+                    Log.d("ImageDebug", "[GCS] Blob found. Generating signed URL for: $gcsUrl")
                     val signedUrl = blob.signUrl(1, TimeUnit.HOURS)
-                    Log.i(TAG, "Successfully generated signed URL for $gcsUrl")
+                    Log.i("ImageDebug", "[GCS] Successfully generated signed URL: $signedUrl")
                     return@withContext signedUrl.toString()
                 } else {
-                    Log.w(TAG, "Blob does not exist at path: $gcsUrl")
+                    Log.w("ImageDebug", "[GCS-ERROR] Blob does not exist at path: $gcsUrl")
                     return@withContext null
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error generating signed URL for: $gcsUrl", e)
+            Log.e("ImageDebug", "[GCS-AUTH-URL-ERROR] Error generating signed URL for: $gcsUrl", e)
             return@withContext null
         }
+        // Add a return statement for the case where getStorage() is null
+        return@withContext null
     }
 
     fun loadFamilyMembersFlow(): Flow<FamilyMember> = flow {

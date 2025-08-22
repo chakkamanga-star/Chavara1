@@ -188,8 +188,11 @@ fun AppNavigation(
             }
             composable("family_photo_edit/{memberId}") { backStackEntry ->
                 val memberId = backStackEntry.arguments?.getString("memberId")?.toIntOrNull() ?: 0
+                val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(AppDestinations.FAMILY_ROUTE) }
+                val familyViewModel: FamilyMembersViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = viewModelFactory)
                 FamilyMemberPhotoEditScreen(
                     memberId = memberId,
+                    viewModel = familyViewModel,
                     onDoneEditing = { navController.popBackStack() }
                 )
             }

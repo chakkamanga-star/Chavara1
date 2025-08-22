@@ -52,4 +52,13 @@ open class FamilyMembersViewModel(
     fun getMemberById(id: Int): FamilyMember? {
         return repository.getMemberById(id)
     }
+
+    fun uploadMemberPhoto(memberId: Int, imageBytes: ByteArray, mimeType: String) {
+        viewModelScope.launch {
+            repository.uploadMemberPhoto(memberId, imageBytes, mimeType)
+        }
+    }
+    suspend fun getAuthenticatedImageUrl(gcsUrl: String): String? {
+        return repository.getAuthenticatedImageUrl(gcsUrl)
+    }
 }

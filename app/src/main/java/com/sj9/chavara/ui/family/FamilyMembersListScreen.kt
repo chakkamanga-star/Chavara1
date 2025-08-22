@@ -31,12 +31,11 @@ import com.sj9.chavara.viewmodel.FamilyMembersViewModel
 
 @Composable
 fun FamilyMembersListScreen(
-    viewModel: FamilyMembersViewModel, // ViewModel is now passed in
+    viewModel: FamilyMembersViewModel,
     onMemberClick: (FamilyMember) -> Unit = {},
     onAddMemberClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // Collect the state from the ViewModel
     val familyMembers by viewModel.familyMembers.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
@@ -89,7 +88,8 @@ fun FamilyMembersListScreen(
                     items(familyMembers) { member ->
                         FamilyMemberCard(
                             member = member,
-                            onClick = { onMemberClick(member) }
+                            onClick = { onMemberClick(member) },
+                            viewModel = viewModel
                         )
                     }
                     item {
@@ -99,7 +99,6 @@ fun FamilyMembersListScreen(
             }
         }
 
-        // "Add Member" button
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -136,8 +135,18 @@ fun FamilyMembersListScreen(
 private fun FamilyMemberCard(
     member: FamilyMember,
     onClick: () -> Unit,
+    viewModel: FamilyMembersViewModel,
     modifier: Modifier = Modifier
 ) {
+    var signedImageUrl by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(member.photoUrl) {
+        if (member.photoUrl.startsWith("gs://")) {
+            signedImageUrl = viewModel.getAuthenticatedImageUrl(member.photoUrl)
+        } else {
+            signedImageUrl = member.photoUrl
+        }
+    }
     Box(
         modifier = modifier
             .size(width = 170.dp, height = 209.dp)
@@ -155,7 +164,7 @@ private fun FamilyMemberCard(
         contentAlignment = Alignment.Center
     ) {
         AsyncMemberImage(
-            imageUrl = member.photoUrl,
+            imageUrl = signedImageUrl ?: "",
             memberName = member.name,
             size = 140.dp,
             cornerRadius = 16.dp
