@@ -19,7 +19,6 @@ open class FamilyMembersViewModel(
         }
     }
 
-    // FIX: Removed the redundant .asStateFlow() calls
     val familyMembers: StateFlow<List<FamilyMember>> = repository.familyMembers
     val isLoading: StateFlow<Boolean> = repository.isLoading
     val userProfile: StateFlow<FamilyMember?> = repository.userProfile
@@ -34,7 +33,6 @@ open class FamilyMembersViewModel(
 
     fun saveFamilyMember(member: FamilyMember) {
         viewModelScope.launch {
-            // If the member is new (ID is 0 or less), get a new ID from the repository
             if (member.id <= 0) {
                 val newId = repository.getNewFamilyMemberId()
                 repository.saveFamilyMember(member.copy(id = newId))

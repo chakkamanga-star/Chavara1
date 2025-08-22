@@ -28,6 +28,7 @@ import com.sj9.chavara.data.model.FamilyMember
 import com.sj9.chavara.ui.components.AsyncMemberImage
 import com.sj9.chavara.ui.theme.ris
 import com.sj9.chavara.viewmodel.FamilyMembersViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun FamilyMembersListScreen(
@@ -88,7 +89,8 @@ fun FamilyMembersListScreen(
                     items(familyMembers) { member ->
                         FamilyMemberCard(
                             member = member,
-                            onClick = { onMemberClick(member) }
+                            onClick = { onMemberClick(member) },
+                            viewModel = viewModel
                         )
                     }
                     item {
@@ -134,8 +136,21 @@ fun FamilyMembersListScreen(
 private fun FamilyMemberCard(
     member: FamilyMember,
     onClick: () -> Unit,
+    viewModel: FamilyMembersViewModel,
     modifier: Modifier = Modifier
 ) {
+    var signedImageUrl by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(member.photoUrl) {
+        coroutineScope.launch {
+            if (member.photoUrl.startsWith("gs://")) {
+                signedImageUrl = viewModel.getAuthenticatedImageUrl(member.photoUrl)
+            } else {
+                signedImageUrl = member.photoUrl
+            }
+        }
+    }
     Box(
         modifier = modifier
             .size(width = 170.dp, height = 209.dp)
@@ -152,10 +167,8 @@ private fun FamilyMemberCard(
             ),
         contentAlignment = Alignment.Center
     ) {
-        // The URL from the member object is now a direct HTTPS link,
-        // so we can use it directly without any extra logic.
         AsyncMemberImage(
-            imageUrl = member.photoUrl,
+            imageUrl = signedImageUrl ?: "",
             memberName = member.name,
             size = 140.dp,
             cornerRadius = 16.dp
