@@ -50,27 +50,33 @@ fun AsyncMemberImage(
                     .build()
             )
 
-            when (val state = painter.state) {
-                is AsyncImagePainter.State.Loading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(size / 4),
-                        color = Color.White,
-                        strokeWidth = 2.dp
-                    )
-                }
-                is AsyncImagePainter.State.Success -> {
+            val state = painter.state
+
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (state is AsyncImagePainter.State.Success) {
                     Image(
                         painter = painter,
                         contentDescription = "$memberName's photo",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
-                }
-                is AsyncImagePainter.State.Error -> {
+                } else if (state is AsyncImagePainter.State.Error) {
                     MemberInitials(memberName = memberName)
-                }
-                else -> {
-                    MemberInitials(memberName = memberName)
+                } else {
+                    // Show the image (which may be blank/placeholder) and overlay progress if loading
+                    Image(
+                        painter = painter,
+                        contentDescription = "$memberName's photo",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    if (state is AsyncImagePainter.State.Loading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(size / 4),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    }
                 }
             }
         }
